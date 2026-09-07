@@ -194,7 +194,7 @@ $maint_items = $conn->query("SELECT * FROM maintenance_items WHERE actual_stocks
             <div class="col-lg-7 mb-3 mb-lg-0">
                 <span class="badge bg-warning text-dark fw-extrabold mb-2 px-3 py-1 rounded-pill text-uppercase shadow-sm" style="letter-spacing: 0.5px;">Central Supply Room</span>
                 <h2 class="mb-2">Select supply </h2>
-              
+
             </div>
             <div class="col-lg-5">
                 <div class="input-group hero-search-box">
@@ -221,6 +221,8 @@ $maint_items = $conn->query("SELECT * FROM maintenance_items WHERE actual_stocks
 
                             <input type="radio" class="btn-check" name="request_type" id="cat_maint" value="maintenance" onchange="switchCategory('maintenance')">
                             <label class="btn category-pill" for="cat_maint"><i class="bi bi-tools me-1"></i>Maintenance Supplies</label>
+
+                            <a href="place_order.php?type=document_printing" class="btn category-pill"><i class="bi bi-printer me-1"></i>Document Printing</a>
                         </div>
                     </div>
                     <span class="badge bg-primary text-white border-0 px-3 py-2 fw-bold" id="available-count-badge"><i class="bi bi-check-circle-fill me-1"></i>Available Items</span>

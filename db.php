@@ -44,5 +44,33 @@ if ($conn->connect_error) {
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     ");
+
+    // Add scheduled_time column to supply_requests and maintenance_requests if they exist
+    @$conn->query("ALTER TABLE supply_requests ADD COLUMN scheduled_time VARCHAR(50) NULL DEFAULT '09:00 AM - 10:00 AM'");
+    @$conn->query("ALTER TABLE maintenance_requests ADD COLUMN scheduled_time VARCHAR(50) NULL DEFAULT '09:00 AM - 10:00 AM'");
+
+    // Tiyaking umiiral ang document_printing_requests table
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS document_printing_requests (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            request_group_id VARCHAR(100) NOT NULL,
+            requisitioner_name VARCHAR(255) NOT NULL,
+            department VARCHAR(100) NOT NULL,
+            document_file VARCHAR(255) NOT NULL,
+            paper_size VARCHAR(50) NOT NULL DEFAULT 'A4',
+            print_color VARCHAR(50) NOT NULL DEFAULT 'Black & White',
+            print_sides VARCHAR(50) NOT NULL DEFAULT 'Single-sided',
+            binding_option VARCHAR(50) NOT NULL DEFAULT 'None',
+            page_count INT NOT NULL DEFAULT 1,
+            copies INT NOT NULL DEFAULT 1,
+            total_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+            purpose TEXT NULL,
+            date_needed DATE NULL,
+            scheduled_time VARCHAR(50) NULL DEFAULT '09:00 AM - 10:00 AM',
+            status VARCHAR(50) NOT NULL DEFAULT 'Pending',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    ");
 }
 ?>

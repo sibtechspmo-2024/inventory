@@ -51,7 +51,7 @@ if (isset($_GET['fetch_request_details']) && $_GET['fetch_request_details'] == '
     $item_table = ($type === 'maintenance') ? 'maintenance_items' : 'items';
 
     $stmt = $conn->prepare("
-        SELECT r.id as req_id, r.quantity, r.item_id, i.item_name, i.unit, i.actual_stocks
+        SELECT r.id as req_id, r.quantity, r.item_id, r.date_needed, r.scheduled_time, i.item_name, i.unit, i.actual_stocks
         FROM {$req_table} r
         JOIN {$item_table} i ON r.item_id = i.id
         WHERE r.request_group_id = ? AND r.status = 'Pending'
@@ -61,6 +61,14 @@ if (isset($_GET['fetch_request_details']) && $_GET['fetch_request_details'] == '
     $result = $stmt->get_result();
 
     if ($result && $result->num_rows > 0) {
+        $first_row = $result->fetch_assoc();
+        $result->data_seek(0);
+
+        echo '<div class="alert alert-info py-2 mb-3 small d-flex justify-content-between align-items-center">';
+        echo '<span><i class="fa-solid fa-calendar-check me-1"></i><strong>Scheduled Date:</strong> ' . ($first_row['date_needed'] ? htmlspecialchars($first_row['date_needed']) : 'N/A') . '</span>';
+        echo '<span><i class="fa-solid fa-clock me-1"></i><strong>Scheduled Time:</strong> ' . htmlspecialchars($first_row['scheduled_time'] ?? '09:00 AM - 10:00 AM') . '</span>';
+        echo '</div>';
+
         echo '<form id="editRequestItemsForm" class="ajax-form">';
         echo '<input type="hidden" name="action_request" value="1">';
         echo '<input type="hidden" name="action" id="modal_action_type" value="Approved">';
@@ -104,6 +112,37 @@ function sendResponse($message, $success = true) {
 
 $message = $_SESSION['flash_message'] ?? '';
 unset($_SESSION['flash_message']);
+
+// ACTION HANDLER PARA SA DOCUMENT PRINTING REQUESTS
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_print_request'])) {
+    $req_id = intval($_POST['request_id'] ?? 0);
+    $action = $_POST['action'] ?? '';
+
+    if ($req_id > 0 && in_array($action, ['Approved', 'Completed', 'Rejected'])) {
+        $stmt_up = $conn->prepare("UPDATE document_printing_requests SET status = ? WHERE id = ?");
+        $stmt_up->bind_param("si", $action, $req_id);
+        if ($stmt_up->execute()) {
+            // Notify user
+            $stmt_get = $conn->prepare("SELECT user_id, request_group_id FROM document_printing_requests WHERE id = ?");
+            $stmt_get->bind_param("i", $req_id);
+            $stmt_get->execute();
+            $p_res = $stmt_get->get_result()->fetch_assoc();
+
+            if ($p_res && !empty($p_res['user_id'])) {
+                $notif_msg = "Ang iyong Document Printing request (#" . $p_res['request_group_id'] . ") ay na-" . strtolower($action) . " na!";
+                $stmt_notif = $conn->prepare("INSERT INTO notifications (user_id, message) VALUES (?, ?)");
+                $stmt_notif->bind_param("is", $p_res['user_id'], $notif_msg);
+                $stmt_notif->execute();
+            }
+
+            sendResponse("Matagumpay na na-update ang Document Printing request status sa $action!", true);
+        } else {
+            sendResponse("Nabigong i-update ang status.", false);
+        }
+    } else {
+        sendResponse("Invalid parameters.", false);
+    }
+}
 
 // APPROVE / REJECT
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_request'])) {
@@ -213,6 +252,13 @@ $maint_requests = $conn->query("
     ORDER BY max_id DESC
 ");
 
+$print_requests = $conn->query("
+    SELECT id, user_id, request_group_id, requisitioner_name, department, document_file, paper_size, print_color, print_sides, binding_option, page_count, copies, total_price, purpose, date_needed, scheduled_time, status, created_at
+    FROM document_printing_requests
+    ORDER BY id DESC
+");
+
+$print_pending_count = $conn->query("SELECT COUNT(*) as cnt FROM document_printing_requests WHERE status = 'Pending'")->fetch_assoc()['cnt'] ?? 0;
 $office_pending_count = $office_requests ? $office_requests->num_rows : 0;
 $maint_pending_count = $maint_requests ? $maint_requests->num_rows : 0;
 
@@ -365,21 +411,21 @@ usort($all_history_requests, function($a, $b) {
             </div>
         </div>
         <div class="col-sm-6 col-lg-3">
-            <div class="stat-card stat-card-red">
+            <div class="stat-card bg-primary text-white p-3 rounded-4 shadow-sm d-flex justify-content-between align-items-center">
                 <div>
-                    <small class="text-white-50 uppercase fw-bold">Out-of-Stock Office Items</small>
-                    <h3 class="fw-bold mb-0 mt-1"><?= $office_out_of_stock ?></h3>
+                    <small class="text-white-50 uppercase fw-bold">Pending Printing Orders</small>
+                    <h3 class="fw-bold mb-0 mt-1"><?= $print_pending_count ?></h3>
                 </div>
-                <div class="stat-icon"><i class="fa-solid fa-circle-exclamation"></i></div>
+                <div class="stat-icon fs-1 opacity-50"><i class="fa-solid fa-print"></i></div>
             </div>
         </div>
         <div class="col-sm-6 col-lg-3">
-            <div class="stat-card stat-card-green">
+            <div class="stat-card stat-card-red">
                 <div>
-                    <small class="text-white-50 uppercase fw-bold">Out-of-Stock Maint Items</small>
-                    <h3 class="fw-bold mb-0 mt-1"><?= $maint_out_of_stock ?></h3>
+                    <small class="text-white-50 uppercase fw-bold">Out-of-Stock Items</small>
+                    <h3 class="fw-bold mb-0 mt-1"><?= $office_out_of_stock + $maint_out_of_stock ?></h3>
                 </div>
-                <div class="stat-icon"><i class="fa-solid fa-warehouse"></i></div>
+                <div class="stat-icon"><i class="fa-solid fa-circle-exclamation"></i></div>
             </div>
         </div>
     </div>
@@ -401,6 +447,12 @@ $is_req_hist = isset($_GET['req_status']) || isset($_GET['req_cat']);
                 <button class="nav-link d-flex align-items-center justify-content-center gap-2" id="maint-req-tab" data-bs-toggle="tab" data-bs-target="#maint-req" type="button">
                     <span><i class="fa-solid fa-wrench me-1"></i> Maintenance Orders</span>
                     <span class="badge rounded-pill bg-secondary text-white fw-bold" id="maint-tab-badge"><?= $maint_pending_count ?></span>
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link d-flex align-items-center justify-content-center gap-2" id="print-req-tab" data-bs-toggle="tab" data-bs-target="#print-req" type="button">
+                    <span><i class="fa-solid fa-print me-1"></i> Document Printing</span>
+                    <span class="badge rounded-pill bg-warning text-dark fw-bold" id="print-tab-badge"><?= $print_pending_count ?></span>
                 </button>
             </li>
             <li class="nav-item">
@@ -459,6 +511,99 @@ $is_req_hist = isset($_GET['req_status']) || isset($_GET['req_cat']);
                             <?php else: ?>
                                 <tr>
                                     <td colspan="6" class="text-center text-muted py-4">Walang nakabinbing Office Supply Orders.</td>
+                                </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 3: Document Printing Requests -->
+        <div class="tab-pane fade" id="print-req">
+            <div class="card p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold text-dark mb-0"><i class="fa-solid fa-print text-logo-blue me-2"></i>Document Printing Requests</h5>
+                </div>
+                <div class="table-responsive table-container">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Order ID</th>
+                                <th>Requisitioner</th>
+                                <th>Document</th>
+                                <th>Print Specifications</th>
+                                <th>Scheduled Time</th>
+                                <th>Total Price</th>
+                                <th>Status</th>
+                                <th class="text-end">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if ($print_requests && $print_requests->num_rows > 0): ?>
+                                <?php while($p = $print_requests->fetch_assoc()): ?>
+                                    <tr>
+                                        <td class="fw-bold text-logo-blue">#<?= htmlspecialchars($p['request_group_id']) ?></td>
+                                        <td>
+                                            <strong class="text-dark"><?= htmlspecialchars($p['requisitioner_name']) ?></strong><br>
+                                            <span class="badge bg-light text-dark border"><?= htmlspecialchars($p['department']) ?></span>
+                                        </td>
+                                        <td>
+                                            <?php if (!empty($p['document_file'])): ?>
+                                                <a href="uploads/<?= htmlspecialchars($p['document_file']) ?>" target="_blank" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-semibold">
+                                                    <i class="fa-solid fa-file-pdf me-1"></i> View Document
+                                                </a>
+                                            <?php else: ?>
+                                                <span class="text-muted small">No File</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td class="small">
+                                            <strong>Size:</strong> <?= htmlspecialchars($p['paper_size']) ?><br>
+                                            <strong>Color:</strong> <?= htmlspecialchars($p['print_color']) ?> | <strong>Sides:</strong> <?= htmlspecialchars($p['print_sides']) ?><br>
+                                            <strong>Binding:</strong> <?= htmlspecialchars($p['binding_option']) ?><br>
+                                            <strong>Copies:</strong> <?= $p['page_count'] ?> pgs x <?= $p['copies'] ?> copies
+                                        </td>
+                                        <td class="small text-nowrap">
+                                            <strong class="text-primary"><i class="fa-solid fa-calendar me-1"></i><?= $p['date_needed'] ? date('Y-m-d', strtotime($p['date_needed'])) : '-' ?></strong><br>
+                                            <span class="text-muted"><i class="fa-solid fa-clock me-1"></i><?= htmlspecialchars($p['scheduled_time'] ?? '09:00 AM - 10:00 AM') ?></span>
+                                        </td>
+                                        <td class="fw-bold text-success">₱<?= number_format($p['total_price'], 2) ?></td>
+                                        <td>
+                                            <?php
+                                            $pst = $p['status'];
+                                            if ($pst === 'Approved') echo '<span class="badge bg-success-subtle text-success border border-success-subtle fw-bold"><i class="fa-solid fa-circle-check me-1"></i>Approved</span>';
+                                            elseif ($pst === 'Completed') echo '<span class="badge bg-primary-subtle text-primary border border-primary-subtle fw-bold"><i class="fa-solid fa-check-double me-1"></i>Completed</span>';
+                                            elseif ($pst === 'Rejected') echo '<span class="badge bg-danger-subtle text-danger border border-danger-subtle fw-bold"><i class="fa-solid fa-circle-xmark me-1"></i>Rejected</span>';
+                                            else echo '<span class="badge bg-warning-subtle text-warning border border-warning-subtle fw-bold text-dark"><i class="fa-solid fa-clock me-1"></i>Pending</span>';
+                                            ?>
+                                        </td>
+                                        <td class="text-end">
+                                            <div class="btn-group">
+                                                <form method="POST" action="" class="ajax-form d-inline">
+                                                    <input type="hidden" name="action_print_request" value="1">
+                                                    <input type="hidden" name="request_id" value="<?= $p['id'] ?>">
+                                                    <input type="hidden" name="action" value="Approved">
+                                                    <button type="submit" class="btn btn-sm btn-success rounded-pill px-2 me-1" title="Approve" onclick="return confirm('I-approve ang printing request na ito?');"><i class="fa-solid fa-check"></i> Approve</button>
+                                                </form>
+                                                <form method="POST" action="" class="ajax-form d-inline">
+                                                    <input type="hidden" name="action_print_request" value="1">
+                                                    <input type="hidden" name="request_id" value="<?= $p['id'] ?>">
+                                                    <input type="hidden" name="action" value="Completed">
+                                                    <button type="submit" class="btn btn-sm btn-primary rounded-pill px-2 me-1" title="Complete" onclick="return confirm('Mark as completed?');"><i class="fa-solid fa-check-double"></i> Complete</button>
+                                                </form>
+                                                <form method="POST" action="" class="ajax-form d-inline">
+                                                    <input type="hidden" name="action_print_request" value="1">
+                                                    <input type="hidden" name="request_id" value="<?= $p['id'] ?>">
+                                                    <input type="hidden" name="action" value="Rejected">
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-2" title="Reject" onclick="return confirm('I-reject ang printing request na ito?');"><i class="fa-solid fa-xmark"></i> Reject</button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                <?php endwhile; ?>
+                            <?php else: ?>
+                                <tr>
+                                    <td colspan="7" class="text-center text-muted py-4">Walang document printing requests.</td>
                                 </tr>
                             <?php endif; ?>
                         </tbody>

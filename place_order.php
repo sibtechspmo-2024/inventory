@@ -88,56 +88,107 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['request_supply'])) {
     $quantities = $_POST['quantity'] ?? [];
 
     if (!empty($item_ids) && is_array($item_ids)) {
-        $prefix = ($request_type === 'maintenance') ? 'MNT-' : 'REQ-';
-        $request_group_id = $prefix . date('YmdHis') . '-' . rand(100, 999);
+        if ($request_type === 'borrow') {
+            $prefix = 'BRW-';
+            $request_group_id = $prefix . date('YmdHis') . '-' . rand(100, 999);
+            $borrow_date = $_POST['borrow_date'] ?? $date_needed ?? date('Y-m-d');
+            $expected_return_date = $_POST['expected_return_date'] ?? date('Y-m-d', strtotime('+3 days'));
 
-        $request_table = ($request_type === 'maintenance') ? 'maintenance_requests' : 'supply_requests';
-        $item_table = ($request_type === 'maintenance') ? 'maintenance_items' : 'items';
+            $stmt = $conn->prepare("INSERT INTO borrow_requests (request_group_id, user_id, requisitioner_name, department, item_id, quantity, borrow_date, expected_return_date, scheduled_time, purpose) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $check_stock_stmt = $conn->prepare("SELECT actual_stocks, item_name FROM items WHERE id = ?");
 
-        $stmt = $conn->prepare("INSERT INTO {$request_table} (request_group_id, user_id, requisitioner_name, department, item_id, quantity, purpose, date_needed, scheduled_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $check_stock_stmt = $conn->prepare("SELECT actual_stocks, item_name FROM {$item_table} WHERE id = ?");
+            $inserted_count = 0;
+            $conn->begin_transaction();
 
-        $inserted_count = 0;
-        $conn->begin_transaction();
+            try {
+                foreach ($item_ids as $index => $item_id) {
+                    $item_id = intval($item_id);
+                    $qty = intval($quantities[$index] ?? 0);
 
-        try {
-            foreach ($item_ids as $index => $item_id) {
-                $item_id = intval($item_id);
-                $qty = intval($quantities[$index] ?? 0);
+                    if ($item_id > 0 && $qty > 0) {
+                        $check_stock_stmt->bind_param("i", $item_id);
+                        $check_stock_stmt->execute();
+                        $chk_res = $check_stock_stmt->get_result()->fetch_assoc();
 
-                if ($item_id > 0 && $qty > 0) {
-                    $check_stock_stmt->bind_param("i", $item_id);
-                    $check_stock_stmt->execute();
-                    $chk_res = $check_stock_stmt->get_result()->fetch_assoc();
+                        if (!$chk_res || $chk_res['actual_stocks'] < $qty) {
+                            $iname = $chk_res['item_name'] ?? 'Selected Item';
+                            throw new Exception("Kulang ang available stock para sa hihiraming item na: " . $iname);
+                        }
 
-                    if (!$chk_res || $chk_res['actual_stocks'] < $qty) {
-                        $iname = $chk_res['item_name'] ?? 'Selected Item';
-                        throw new Exception("Kulang ang available stock para sa item na: " . $iname);
+                        $stmt->bind_param("sissiissss", $request_group_id, $user_id, $requisitioner_name, $department, $item_id, $qty, $borrow_date, $expected_return_date, $scheduled_time, $purpose);
+                        $stmt->execute();
+                        $inserted_count++;
                     }
-
-                    $stmt->bind_param("sississss", $request_group_id, $user_id, $requisitioner_name, $department, $item_id, $qty, $purpose, $date_needed, $scheduled_time);
-                    $stmt->execute();
-                    $inserted_count++;
                 }
-            }
 
-            if ($inserted_count > 0) {
-                $conn->commit();
-
-                echo json_encode([
-                    'status' => 'success',
-                    'message' => "Matagumpay na naisumite ang iyong " . ucfirst($request_type) . " request ($request_group_id)!",
-                    'group_id' => $request_group_id
-                ]);
+                if ($inserted_count > 0) {
+                    $conn->commit();
+                    echo json_encode([
+                        'status' => 'success',
+                        'message' => "Matagumpay na naisumite ang iyong Borrow request ($request_group_id)!",
+                        'group_id' => $request_group_id
+                    ]);
+                    exit;
+                } else {
+                    throw new Exception("Walang valid na item na naisumite.");
+                }
+            } catch (Exception $e) {
+                $conn->rollback();
+                echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
                 exit;
-            } else {
-                throw new Exception("Walang valid na item na naisumite.");
             }
+        } else {
+            $prefix = ($request_type === 'maintenance') ? 'MNT-' : 'REQ-';
+            $request_group_id = $prefix . date('YmdHis') . '-' . rand(100, 999);
 
-        } catch (Exception $e) {
-            $conn->rollback();
-            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
-            exit;
+            $request_table = ($request_type === 'maintenance') ? 'maintenance_requests' : 'supply_requests';
+            $item_table = ($request_type === 'maintenance') ? 'maintenance_items' : 'items';
+
+            $stmt = $conn->prepare("INSERT INTO {$request_table} (request_group_id, user_id, requisitioner_name, department, item_id, quantity, purpose, date_needed, scheduled_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $check_stock_stmt = $conn->prepare("SELECT actual_stocks, item_name FROM {$item_table} WHERE id = ?");
+
+            $inserted_count = 0;
+            $conn->begin_transaction();
+
+            try {
+                foreach ($item_ids as $index => $item_id) {
+                    $item_id = intval($item_id);
+                    $qty = intval($quantities[$index] ?? 0);
+
+                    if ($item_id > 0 && $qty > 0) {
+                        $check_stock_stmt->bind_param("i", $item_id);
+                        $check_stock_stmt->execute();
+                        $chk_res = $check_stock_stmt->get_result()->fetch_assoc();
+
+                        if (!$chk_res || $chk_res['actual_stocks'] < $qty) {
+                            $iname = $chk_res['item_name'] ?? 'Selected Item';
+                            throw new Exception("Kulang ang available stock para sa item na: " . $iname);
+                        }
+
+                        $stmt->bind_param("sississss", $request_group_id, $user_id, $requisitioner_name, $department, $item_id, $qty, $purpose, $date_needed, $scheduled_time);
+                        $stmt->execute();
+                        $inserted_count++;
+                    }
+                }
+
+                if ($inserted_count > 0) {
+                    $conn->commit();
+
+                    echo json_encode([
+                        'status' => 'success',
+                        'message' => "Matagumpay na naisumite ang iyong " . ucfirst($request_type) . " request ($request_group_id)!",
+                        'group_id' => $request_group_id
+                    ]);
+                    exit;
+                } else {
+                    throw new Exception("Walang valid na item na naisumite.");
+                }
+
+            } catch (Exception $e) {
+                $conn->rollback();
+                echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+                exit;
+            }
         }
     }
 
@@ -218,6 +269,7 @@ $maint_items = $conn->query("SELECT * FROM maintenance_items WHERE actual_stocks
                             <option value="office">Office Supplies Requisition</option>
                             <option value="maintenance">Maintenance Supplies Requisition</option>
                             <option value="document_printing">Document Printing Requisition</option>
+                            <option value="borrow">Borrow Equipment / Items Requisition</option>
                         </select>
                     </div>
                     <div class="col-md-6">
@@ -235,6 +287,18 @@ $maint_items = $conn->query("SELECT * FROM maintenance_items WHERE actual_stocks
                     <div class="col-md-4">
                         <label class="form-label fw-semibold text-dark">Scheduled Date Needed</label>
                         <input type="date" name="date_needed" class="form-control fw-semibold" required>
+                    </div>
+                    <div class="col-md-12 d-none" id="borrow_dates_section">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold text-dark"><i class="bi bi-calendar-event me-1 text-primary"></i>Borrow Start Date</label>
+                                <input type="date" name="borrow_date" id="borrow_date" class="form-control fw-semibold">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold text-dark"><i class="bi bi-calendar-check me-1 text-primary"></i>Expected Return Date</label>
+                                <input type="date" name="expected_return_date" id="expected_return_date" class="form-control fw-semibold">
+                            </div>
+                        </div>
                     </div>
                     <div class="col-md-12">
                         <label class="form-label fw-semibold text-dark"><i class="bi bi-clock-history me-1 text-primary"></i>Scheduled Time Slot / Preferred Pickup</label>
@@ -421,7 +485,16 @@ function onCategoryChange() {
     const category = document.getElementById('request_type').value;
     const printingSection = document.getElementById('printing_section');
     const supplySection = document.getElementById('supply_section');
+    const borrowDatesSection = document.getElementById('borrow_dates_section');
     const submitBtn = document.getElementById('submitOrderBtn');
+
+    if (borrowDatesSection) {
+        if (category === 'borrow') {
+            borrowDatesSection.classList.remove('d-none');
+        } else {
+            borrowDatesSection.classList.add('d-none');
+        }
+    }
 
     if (category === 'document_printing') {
         if (printingSection) printingSection.classList.remove('d-none');

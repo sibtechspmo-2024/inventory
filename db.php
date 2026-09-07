@@ -45,6 +45,25 @@ if ($conn->connect_error) {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     ");
 
+    // Tiyaking umiiral ang borrow_requests table
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS borrow_requests (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            request_group_id VARCHAR(100) NOT NULL,
+            requisitioner_name VARCHAR(255) NOT NULL,
+            department VARCHAR(100) NOT NULL,
+            item_id INT NOT NULL,
+            quantity INT NOT NULL DEFAULT 1,
+            borrow_date DATE NOT NULL,
+            expected_return_date DATE NOT NULL,
+            scheduled_time VARCHAR(50) NULL DEFAULT '09:00 AM - 10:00 AM',
+            purpose TEXT NULL,
+            status VARCHAR(50) NOT NULL DEFAULT 'Pending',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    ");
+
     // Add scheduled_time column to supply_requests and maintenance_requests if they exist
     @$conn->query("ALTER TABLE supply_requests ADD COLUMN scheduled_time VARCHAR(50) NULL DEFAULT '09:00 AM - 10:00 AM'");
     @$conn->query("ALTER TABLE maintenance_requests ADD COLUMN scheduled_time VARCHAR(50) NULL DEFAULT '09:00 AM - 10:00 AM'");

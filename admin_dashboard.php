@@ -113,6 +113,45 @@ function sendResponse($message, $success = true) {
 $message = $_SESSION['flash_message'] ?? '';
 unset($_SESSION['flash_message']);
 
+// ACTION HANDLER PARA SA BORROW REQUESTS
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_borrow_request'])) {
+    $req_id = intval($_POST['request_id'] ?? 0);
+    $action = $_POST['action'] ?? '';
+
+    if ($req_id > 0 && in_array($action, ['Approved', 'Returned', 'Rejected'])) {
+        $stmt_up = $conn->prepare("UPDATE borrow_requests SET status = ? WHERE id = ?");
+        $stmt_up->bind_param("si", $action, $req_id);
+        if ($stmt_up->execute()) {
+            // Deduct / Restore stock
+            $stmt_get = $conn->prepare("SELECT user_id, request_group_id, item_id, quantity FROM borrow_requests WHERE id = ?");
+            $stmt_get->bind_param("i", $req_id);
+            $stmt_get->execute();
+            $b_res = $stmt_get->get_result()->fetch_assoc();
+
+            if ($b_res) {
+                if ($action === 'Approved') {
+                    $conn->query("UPDATE items SET actual_stocks = actual_stocks - " . intval($b_res['quantity']) . " WHERE id = " . intval($b_res['item_id']));
+                } elseif ($action === 'Returned') {
+                    $conn->query("UPDATE items SET actual_stocks = actual_stocks + " . intval($b_res['quantity']) . " WHERE id = " . intval($b_res['item_id']));
+                }
+
+                if (!empty($b_res['user_id'])) {
+                    $notif_msg = "Ang iyong Borrow request (#" . $b_res['request_group_id'] . ") ay na-" . strtolower($action) . " na!";
+                    $stmt_notif = $conn->prepare("INSERT INTO notifications (user_id, message) VALUES (?, ?)");
+                    $stmt_notif->bind_param("is", $b_res['user_id'], $notif_msg);
+                    $stmt_notif->execute();
+                }
+            }
+
+            sendResponse("Matagumpay na na-update ang Borrow request status sa $action!", true);
+        } else {
+            sendResponse("Nabigong i-update ang status.", false);
+        }
+    } else {
+        sendResponse("Invalid parameters.", false);
+    }
+}
+
 // ACTION HANDLER PARA SA DOCUMENT PRINTING REQUESTS
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_print_request'])) {
     $req_id = intval($_POST['request_id'] ?? 0);
@@ -258,6 +297,14 @@ $print_requests = $conn->query("
     ORDER BY id DESC
 ");
 
+$borrow_requests = $conn->query("
+    SELECT r.id, r.request_group_id, r.requisitioner_name, r.department, r.quantity, r.borrow_date, r.expected_return_date, r.scheduled_time, r.purpose, r.status, r.created_at, i.item_name
+    FROM borrow_requests r
+    JOIN items i ON r.item_id = i.id
+    ORDER BY r.id DESC
+");
+
+$borrow_pending_count = $conn->query("SELECT COUNT(*) as cnt FROM borrow_requests WHERE status = 'Pending'")->fetch_assoc()['cnt'] ?? 0;
 $print_pending_count = $conn->query("SELECT COUNT(*) as cnt FROM document_printing_requests WHERE status = 'Pending'")->fetch_assoc()['cnt'] ?? 0;
 $office_pending_count = $office_requests ? $office_requests->num_rows : 0;
 $maint_pending_count = $maint_requests ? $maint_requests->num_rows : 0;
@@ -351,29 +398,23 @@ usort($all_history_requests, function($a, $b) {
 <body>
 
 <!-- E-COMMERCE ADMIN TOP BAR -->
-<nav class="navbar navbar-expand-lg navbar-dark navbar-admin py-3 shadow-sm">
-    <div class="container">
+<nav class="navbar navbar-expand-lg navbar-dark navbar-admin py-3 shadow-sm" style="background-color: #1b4f9c;">
+    <div class="container-fluid px-4">
         <a class="navbar-brand fw-bold d-flex align-items-center text-white" href="admin_dashboard.php">
-            <img src="logo.jpg" alt="SIBTECH Logo" class="navbar-brand-logo rounded-circle border border-2 border-white">
+            <img src="logo.jpg" alt="SIBTECH Logo" class="navbar-brand-logo rounded-circle border border-2 border-white me-2" style="width: 42px; height: 42px;">
             <div class="lh-1">
-                <span class="fs-5 d-block">SIBTECH ADMIN</span>
-                <small class="fw-light opacity-75" style="font-size: 0.72rem;">E-Commerce Store Management</small>
+                <span class="fs-5 d-block fw-extrabold" style="letter-spacing: 0.5px;">SIBTECH ADMIN</span>
+                <small class="fw-light text-white-50" style="font-size: 0.75rem;">Borrowers & Inventory Management</small>
             </div>
         </a>
         <div class="d-flex flex-wrap align-items-center gap-2">
-            <a href="admin_office.php" class="btn btn-outline-light btn-sm rounded-pill px-3">
-                <i class="fa-solid fa-box-open me-1"></i> Office Page
+            <a href="admin_office.php" class="btn btn-outline-light btn-sm rounded-pill px-3 fw-semibold">
+                <i class="fa-solid fa-box-archive me-1"></i> Office
             </a>
-            <a href="admin_maintenance.php" class="btn btn-outline-light btn-sm rounded-pill px-3">
-                <i class="fa-solid fa-wrench me-1"></i> Maintenance Page
+            <a href="admin_maintenance.php" class="btn btn-outline-light btn-sm rounded-pill px-3 fw-semibold">
+                <i class="fa-solid fa-wrench me-1"></i> Maintenance
             </a>
-            <a href="in_stock.php" class="btn btn-outline-light btn-sm rounded-pill px-3">
-                <i class="fa-solid fa-clock-rotate-left me-1"></i> Stock Update History
-            </a>
-            <a href="export_out_of_stock.php?type=all" class="btn btn-logo-accent btn-sm rounded-pill px-3">
-                <i class="fa-solid fa-file-excel me-1"></i> Export Out of Stock (Excel)
-            </a>
-            <a href="logout.php" class="btn btn-outline-light btn-sm rounded-pill px-3 ms-1">
+            <a href="logout.php" class="btn btn-light btn-sm rounded-pill px-3 text-primary fw-bold ms-1">
                 <i class="fa-solid fa-right-from-bracket me-1"></i> Logout
             </a>
         </div>
@@ -390,42 +431,30 @@ usort($all_history_requests, function($a, $b) {
         <?php endif; ?>
     </div>
 
-    <!-- E-COMMERCE STATS DASHBOARD -->
+    <!-- E-COMMERCE STATS DASHBOARD MATCHING IMAGE UI -->
     <div class="row g-3 mb-4">
         <div class="col-sm-6 col-lg-3">
-            <div class="stat-card stat-card-blue">
-                <div>
-                    <small class="text-white-50 uppercase fw-bold">Pending Office Orders</small>
-                    <h3 class="fw-bold mb-0 mt-1"><?= $office_pending_count ?></h3>
-                </div>
-                <div class="stat-icon"><i class="fa-solid fa-clipboard-check"></i></div>
+            <div class="p-3 rounded-4 text-white shadow-sm" style="background-color: #007bff;">
+                <small class="text-uppercase fw-extrabold tracking-wide" style="font-size: 0.75rem;">OFFICE ORDERS</small>
+                <h2 class="fw-extrabold mb-0 mt-1" style="font-size: 2.2rem;"><?= $office_pending_count ?></h2>
             </div>
         </div>
         <div class="col-sm-6 col-lg-3">
-            <div class="stat-card stat-card-gold">
-                <div>
-                    <small class="text-dark-50 uppercase fw-bold">Pending Maintenance Orders</small>
-                    <h3 class="fw-bold mb-0 mt-1 text-dark"><?= $maint_pending_count ?></h3>
-                </div>
-                <div class="stat-icon text-dark"><i class="fa-solid fa-screwdriver-wrench"></i></div>
+            <div class="p-3 rounded-4 text-dark shadow-sm" style="background-color: #ffc107;">
+                <small class="text-uppercase fw-extrabold tracking-wide" style="font-size: 0.75rem;">MAINTENANCE ORDERS</small>
+                <h2 class="fw-extrabold mb-0 mt-1" style="font-size: 2.2rem;"><?= $maint_pending_count ?></h2>
             </div>
         </div>
         <div class="col-sm-6 col-lg-3">
-            <div class="stat-card bg-primary text-white p-3 rounded-4 shadow-sm d-flex justify-content-between align-items-center">
-                <div>
-                    <small class="text-white-50 uppercase fw-bold">Pending Printing Orders</small>
-                    <h3 class="fw-bold mb-0 mt-1"><?= $print_pending_count ?></h3>
-                </div>
-                <div class="stat-icon fs-1 opacity-50"><i class="fa-solid fa-print"></i></div>
+            <div class="p-3 rounded-4 text-white shadow-sm" style="background-color: #17a2b8;">
+                <small class="text-uppercase fw-extrabold tracking-wide" style="font-size: 0.75rem;">BORROW REQUESTS</small>
+                <h2 class="fw-extrabold mb-0 mt-1" style="font-size: 2.2rem;"><?= $borrow_pending_count ?></h2>
             </div>
         </div>
         <div class="col-sm-6 col-lg-3">
-            <div class="stat-card stat-card-red">
-                <div>
-                    <small class="text-white-50 uppercase fw-bold">Out-of-Stock Items</small>
-                    <h3 class="fw-bold mb-0 mt-1"><?= $office_out_of_stock + $maint_out_of_stock ?></h3>
-                </div>
-                <div class="stat-icon"><i class="fa-solid fa-circle-exclamation"></i></div>
+            <div class="p-3 rounded-4 text-white shadow-sm" style="background-color: #dc3545;">
+                <small class="text-uppercase fw-extrabold tracking-wide" style="font-size: 0.75rem;">OUT OF STOCK ITEMS</small>
+                <h2 class="fw-extrabold mb-0 mt-1" style="font-size: 2.2rem;"><?= $office_out_of_stock + $maint_out_of_stock ?></h2>
             </div>
         </div>
     </div>
@@ -434,40 +463,36 @@ usort($all_history_requests, function($a, $b) {
 $is_stock_hist = isset($_GET['stock_cat']) || isset($_GET['stock_time']);
 $is_req_hist = isset($_GET['req_status']) || isset($_GET['req_cat']);
 ?>
-    <!-- TABS NAVIGATION -->
-    <div class="card mb-4 p-2">
-        <ul class="nav nav-pills nav-fill" id="adminTabs" role="tablist">
-            <li class="nav-item">
-                <button class="nav-link <?= (!$is_stock_hist && !$is_req_hist) ? 'active' : '' ?> d-flex align-items-center justify-content-center gap-2" id="office-req-tab" data-bs-toggle="tab" data-bs-target="#office-req" type="button">
-                    <span><i class="fa-solid fa-cart-shopping me-1"></i> Office Orders</span>
-                    <span class="badge rounded-pill bg-light text-dark fw-bold" id="office-tab-badge"><?= $office_pending_count ?></span>
-                </button>
-            </li>
-            <li class="nav-item">
-                <button class="nav-link d-flex align-items-center justify-content-center gap-2" id="maint-req-tab" data-bs-toggle="tab" data-bs-target="#maint-req" type="button">
-                    <span><i class="fa-solid fa-wrench me-1"></i> Maintenance Orders</span>
-                    <span class="badge rounded-pill bg-secondary text-white fw-bold" id="maint-tab-badge"><?= $maint_pending_count ?></span>
-                </button>
-            </li>
-            <li class="nav-item">
-                <button class="nav-link d-flex align-items-center justify-content-center gap-2" id="print-req-tab" data-bs-toggle="tab" data-bs-target="#print-req" type="button">
-                    <span><i class="fa-solid fa-print me-1"></i> Document Printing</span>
-                    <span class="badge rounded-pill bg-warning text-dark fw-bold" id="print-tab-badge"><?= $print_pending_count ?></span>
-                </button>
-            </li>
-            <li class="nav-item">
-                <button class="nav-link <?= $is_req_hist ? 'active' : '' ?> d-flex align-items-center justify-content-center gap-2" id="user-req-hist-tab" data-bs-toggle="tab" data-bs-target="#user-req-hist" type="button">
-                    <span><i class="fa-solid fa-list-check me-1"></i> Request Orders History</span>
-                    <span class="badge rounded-pill bg-primary text-white fw-bold"><?= count($all_history_requests) ?></span>
-                </button>
-            </li>
-            <li class="nav-item">
-                <button class="nav-link <?= $is_stock_hist ? 'active' : '' ?> d-flex align-items-center justify-content-center gap-2" id="stock-hist-tab" data-bs-toggle="tab" data-bs-target="#stock-hist" type="button">
-                    <span><i class="fa-solid fa-clock-rotate-left me-1"></i> Stock Update History</span>
-                    <span class="badge rounded-pill bg-dark text-white fw-bold"><?= $stock_history ? $stock_history->num_rows : 0 ?></span>
-                </button>
-            </li>
-        </ul>
+    <!-- TABS NAVIGATION EXACTLY MATCHING IMAGE UI -->
+    <div class="card border-0 shadow-sm rounded-4 mb-4 p-2 bg-white">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <ul class="nav nav-pills gap-2" id="adminTabs" role="tablist">
+                <li class="nav-item">
+                    <button class="nav-link <?= (!$is_stock_hist && !$is_req_hist) ? 'active' : '' ?> border-0 text-dark fw-bold px-3 py-2" id="office-req-tab" data-bs-toggle="tab" data-bs-target="#office-req" type="button">
+                        <i class="fa-solid fa-cart-shopping me-2"></i>Office Orders (<?= $office_pending_count ?>)
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link border-0 text-dark fw-bold px-3 py-2" id="maint-req-tab" data-bs-toggle="tab" data-bs-target="#maint-req" type="button">
+                        <i class="fa-solid fa-wrench me-2"></i>Maintenance (<?= $maint_pending_count ?>)
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link border-0 text-dark fw-bold px-3 py-2" id="borrow-req-tab" data-bs-toggle="tab" data-bs-target="#borrow-req" type="button">
+                        <i class="fa-solid fa-hand-holding me-2"></i>Borrow Requests (<?= $borrow_pending_count ?>)
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link border-0 text-dark fw-bold px-3 py-2" id="calendar-tab" data-bs-toggle="tab" data-bs-target="#calendar-view" type="button">
+                        <i class="fa-solid fa-calendar-days me-2"></i>Scheduling & Calendar
+                    </button>
+                </li>
+            </ul>
+            <button class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm" style="background-color: #1b4f9c;" id="user-req-hist-tab-btn" onclick="$('#user-req-hist-tab').click()">
+                <i class="fa-solid fa-list-ul me-2"></i>Order History
+            </button>
+            <button class="d-none" id="user-req-hist-tab" data-bs-toggle="tab" data-bs-target="#user-req-hist" type="button"></button>
+        </div>
     </div>
 
     <div class="tab-content" id="adminTabsContent">
@@ -519,6 +544,167 @@ $is_req_hist = isset($_GET['req_status']) || isset($_GET['req_cat']);
             </div>
         </div>
 
+        <!-- Tab: Borrow Requests -->
+        <div class="tab-pane fade" id="borrow-req">
+            <div class="card p-4 border-0 shadow-sm rounded-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold text-dark mb-0"><i class="fa-solid fa-hand-holding text-logo-blue me-2"></i>Equipment & Supply Borrow Requests</h5>
+                </div>
+                <div class="table-responsive table-container">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Borrow ID</th>
+                                <th>Requisitioner</th>
+                                <th>Borrowed Item</th>
+                                <th>Qty</th>
+                                <th>Schedule & Duration</th>
+                                <th>Status</th>
+                                <th class="text-end">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if ($borrow_requests && $borrow_requests->num_rows > 0): ?>
+                                <?php while($b = $borrow_requests->fetch_assoc()): ?>
+                                    <tr>
+                                        <td class="fw-bold text-logo-blue">#<?= htmlspecialchars($b['request_group_id']) ?></td>
+                                        <td>
+                                            <strong class="text-dark"><?= htmlspecialchars($b['requisitioner_name']) ?></strong><br>
+                                            <span class="badge bg-light text-dark border"><?= htmlspecialchars($b['department']) ?></span>
+                                        </td>
+                                        <td class="fw-semibold text-dark"><?= htmlspecialchars($b['item_name']) ?></td>
+                                        <td><span class="badge bg-secondary rounded-pill"><?= $b['quantity'] ?></span></td>
+                                        <td class="small">
+                                            <strong class="text-primary"><i class="fa-solid fa-calendar-day me-1"></i>Start:</strong> <?= htmlspecialchars($b['borrow_date']) ?><br>
+                                            <strong class="text-danger"><i class="fa-solid fa-calendar-check me-1"></i>Return:</strong> <?= htmlspecialchars($b['expected_return_date']) ?><br>
+                                            <span class="text-muted"><i class="fa-solid fa-clock me-1"></i><?= htmlspecialchars($b['scheduled_time'] ?? '') ?></span>
+                                        </td>
+                                        <td>
+                                            <?php
+                                            $bst = $b['status'];
+                                            if ($bst === 'Approved') echo '<span class="badge bg-success-subtle text-success border border-success-subtle fw-bold"><i class="fa-solid fa-circle-check me-1"></i>Approved</span>';
+                                            elseif ($bst === 'Returned') echo '<span class="badge bg-primary-subtle text-primary border border-primary-subtle fw-bold"><i class="fa-solid fa-rotate-left me-1"></i>Returned</span>';
+                                            elseif ($bst === 'Rejected') echo '<span class="badge bg-danger-subtle text-danger border border-danger-subtle fw-bold"><i class="fa-solid fa-circle-xmark me-1"></i>Rejected</span>';
+                                            else echo '<span class="badge bg-warning-subtle text-warning border border-warning-subtle fw-bold text-dark"><i class="fa-solid fa-clock me-1"></i>Pending</span>';
+                                            ?>
+                                        </td>
+                                        <td class="text-end">
+                                            <div class="btn-group">
+                                                <form method="POST" action="" class="ajax-form d-inline">
+                                                    <input type="hidden" name="action_borrow_request" value="1">
+                                                    <input type="hidden" name="request_id" value="<?= $b['id'] ?>">
+                                                    <input type="hidden" name="action" value="Approved">
+                                                    <button type="submit" class="btn btn-sm btn-success rounded-pill px-2 me-1" title="Approve Borrow" onclick="return confirm('I-approve ang hiram na ito?');"><i class="fa-solid fa-check"></i> Approve</button>
+                                                </form>
+                                                <form method="POST" action="" class="ajax-form d-inline">
+                                                    <input type="hidden" name="action_borrow_request" value="1">
+                                                    <input type="hidden" name="request_id" value="<?= $b['id'] ?>">
+                                                    <input type="hidden" name="action" value="Returned">
+                                                    <button type="submit" class="btn btn-sm btn-primary rounded-pill px-2 me-1" title="Mark Returned" onclick="return confirm('Mark as returned to inventory?');"><i class="fa-solid fa-rotate-left"></i> Returned</button>
+                                                </form>
+                                                <form method="POST" action="" class="ajax-form d-inline">
+                                                    <input type="hidden" name="action_borrow_request" value="1">
+                                                    <input type="hidden" name="request_id" value="<?= $b['id'] ?>">
+                                                    <input type="hidden" name="action" value="Rejected">
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-2" title="Reject" onclick="return confirm('I-reject ang hiram na ito?');"><i class="fa-solid fa-xmark"></i> Reject</button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                <?php endwhile; ?>
+                            <?php else: ?>
+                                <tr>
+                                    <td colspan="7" class="text-center text-muted py-4">Walang borrow requests.</td>
+                                </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: Calendar & Scheduling -->
+        <div class="tab-pane fade" id="calendar-view">
+            <div class="card p-4 border-0 shadow-sm rounded-4">
+                <h5 class="fw-bold text-dark mb-3"><i class="fa-solid fa-calendar-days text-logo-blue me-2"></i>System Scheduling & Calendar Overview</h5>
+                <div class="p-3 bg-light rounded-3 border mb-3">
+                    <p class="mb-0 text-muted small"><i class="fa-solid fa-circle-info text-primary me-2"></i>Ipinapakita rito ang lahat ng mga nakaiskedyul na pickup ng supply orders at deadline ng pagsasauli ng mga hiniram na gamit.</p>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-bordered align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Schedule Date</th>
+                                <th>Time Slot</th>
+                                <th>Request Type</th>
+                                <th>Order / Borrow ID</th>
+                                <th>Requisitioner & Dept</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php
+                            $all_schedules = [];
+
+                            // Borrow return schedules
+                            if ($borrow_requests) {
+                                $borrow_requests->data_seek(0);
+                                while ($b = $borrow_requests->fetch_assoc()) {
+                                    $all_schedules[] = [
+                                        'date' => $b['expected_return_date'],
+                                        'time' => $b['scheduled_time'] ?? '09:00 AM - 10:00 AM',
+                                        'type' => 'Borrow Return Deadline',
+                                        'id' => $b['request_group_id'],
+                                        'req' => $b['requisitioner_name'] . ' (' . $b['department'] . ')',
+                                        'details' => 'Return item: ' . $b['item_name'] . ' (x' . $b['quantity'] . ') - Status: ' . $b['status']
+                                    ];
+                                }
+                            }
+
+                            // Printing schedules
+                            if ($print_requests) {
+                                $print_requests->data_seek(0);
+                                while ($p = $print_requests->fetch_assoc()) {
+                                    if (!empty($p['date_needed'])) {
+                                        $all_schedules[] = [
+                                            'date' => $p['date_needed'],
+                                            'time' => $p['scheduled_time'] ?? '09:00 AM - 10:00 AM',
+                                            'type' => 'Document Printing Pickup',
+                                            'id' => $p['request_group_id'],
+                                            'req' => $p['requisitioner_name'] . ' (' . $p['department'] . ')',
+                                            'details' => 'Document Print (' . $p['paper_size'] . ', ' . $p['print_color'] . ') - Status: ' . $p['status']
+                                        ];
+                                    }
+                                }
+                            }
+
+                            usort($all_schedules, function($a, $b) {
+                                return strtotime($a['date']) - strtotime($b['date']);
+                            });
+
+                            if (!empty($all_schedules)):
+                                foreach ($all_schedules as $sched):
+                            ?>
+                                <tr>
+                                    <td class="fw-bold text-primary"><i class="fa-solid fa-calendar me-1"></i><?= htmlspecialchars($sched['date']) ?></td>
+                                    <td><span class="badge bg-light text-dark border"><?= htmlspecialchars($sched['time']) ?></span></td>
+                                    <td><span class="badge bg-info text-white fw-bold"><?= htmlspecialchars($sched['type']) ?></span></td>
+                                    <td class="fw-bold text-logo-blue">#<?= htmlspecialchars($sched['id']) ?></td>
+                                    <td><?= htmlspecialchars($sched['req']) ?></td>
+                                    <td class="small text-secondary"><?= htmlspecialchars($sched['details']) ?></td>
+                                </tr>
+                            <?php
+                                endforeach;
+                            else:
+                            ?>
+                                <tr><td colspan="6" class="text-center text-muted py-4">Walang nakaiskedyul na mga gawain sa kasalukuyan.</td></tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
         <!-- Tab 3: Document Printing Requests -->
         <div class="tab-pane fade" id="print-req">
             <div class="card p-4">
@@ -540,7 +726,12 @@ $is_req_hist = isset($_GET['req_status']) || isset($_GET['req_cat']);
                             </tr>
                         </thead>
                         <tbody>
-                            <?php if ($print_requests && $print_requests->num_rows > 0): ?>
+                            <?php
+                            if ($print_requests) {
+                                $print_requests->data_seek(0);
+                            }
+                            if ($print_requests && $print_requests->num_rows > 0):
+                            ?>
                                 <?php while($p = $print_requests->fetch_assoc()): ?>
                                     <tr>
                                         <td class="fw-bold text-logo-blue">#<?= htmlspecialchars($p['request_group_id']) ?></td>

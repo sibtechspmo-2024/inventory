@@ -71,11 +71,20 @@ if (isset($_GET['action']) && $_GET['action'] === 'fetch_updates') {
         ORDER BY created_at DESC
     ")->fetch_all(MYSQLI_ASSOC);
 
+    $borrow_requests_res = $conn->query("
+        SELECT r.id, r.request_group_id, r.requisitioner_name, r.department, r.quantity, r.borrow_date, r.expected_return_date, r.scheduled_time, r.purpose, r.status, r.created_at, i.item_name
+        FROM borrow_requests r
+        JOIN items i ON r.item_id = i.id
+        WHERE r.user_id = {$user_id}
+        ORDER BY r.created_at DESC
+    ")->fetch_all(MYSQLI_ASSOC);
+
     echo json_encode([
         'status' => 'success',
         'office' => $office_requests_res,
         'maintenance' => $maint_requests_res,
-        'printing' => $print_requests_res
+        'printing' => $print_requests_res,
+        'borrow' => $borrow_requests_res
     ]);
     exit;
 }
@@ -90,6 +99,14 @@ $office_requests = $conn->query("
     WHERE r.user_id = {$user_id}
     GROUP BY r.request_group_id, u.fullname, r.department, r.purpose, r.date_needed, r.status, r.request_date
     ORDER BY r.request_date DESC
+");
+
+$borrow_requests = $conn->query("
+    SELECT r.id, r.request_group_id, r.requisitioner_name, r.department, r.quantity, r.borrow_date, r.expected_return_date, r.scheduled_time, r.purpose, r.status, r.created_at, i.item_name
+    FROM borrow_requests r
+    JOIN items i ON r.item_id = i.id
+    WHERE r.user_id = {$user_id}
+    ORDER BY r.created_at DESC
 ");
 
 $print_requests = $conn->query("
@@ -172,6 +189,11 @@ $maint_requests = $conn->query("
                     <i class="bi bi-printer me-1"></i> Document Printing Orders
                 </button>
             </li>
+            <li class="nav-item">
+                <button class="nav-link fw-bold" id="borrow-tab" data-bs-toggle="tab" data-bs-target="#borrow-requests" type="button">
+                    <i class="bi bi-hand-holding me-1"></i> Borrow Requests
+                </button>
+            </li>
         </ul>
     </div>
 
@@ -214,6 +236,58 @@ $maint_requests = $conn->query("
                                                 <button class="btn btn-sm btn-outline-danger rounded-pill px-3 delete-btn" onclick="deleteRequest('<?= $req['request_group_id'] ?>', 'office')"><i class="bi bi-trash me-1"></i>Delete</button>
                                             <?php else: ?>
                                                 <button class="btn btn-sm btn-outline-secondary rounded-pill px-3" disabled><i class="bi bi-clock me-1"></i>Pending</button>
+                                            <?php endif; ?>
+                                        </td>
+                                    </tr>
+                                <?php endwhile; ?>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Borrow Requests Table -->
+        <div class="tab-pane fade" id="borrow-requests">
+            <div class="card card-history">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Borrow ID</th><th>Borrowed Item</th><th>Qty</th><th>Duration & Schedule</th><th>Requisitioner</th><th>Status</th><th>Date Requested</th><th class="text-end">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="borrow-tbody">
+                            <?php if(!$borrow_requests || $borrow_requests->num_rows == 0): ?>
+                                <tr class="no-data"><td colspan="8" class="text-center text-muted py-4">Walang borrow requests.</td></tr>
+                            <?php else: ?>
+                                <?php while($req = $borrow_requests->fetch_assoc()): ?>
+                                    <tr id="row-<?= $req['request_group_id'] ?>">
+                                        <td class="fw-bold text-nowrap text-logo-blue">#<?= htmlspecialchars($req['request_group_id']) ?></td>
+                                        <td class="fw-semibold text-dark"><?= htmlspecialchars($req['item_name']) ?></td>
+                                        <td><span class="badge bg-secondary rounded-pill"><?= $req['quantity'] ?></span></td>
+                                        <td class="small">
+                                            <span class="text-primary fw-bold"><i class="bi bi-calendar-event me-1"></i>Start: <?= htmlspecialchars($req['borrow_date']) ?></span><br>
+                                            <span class="text-danger fw-bold"><i class="bi bi-calendar-check me-1"></i>Return: <?= htmlspecialchars($req['expected_return_date']) ?></span><br>
+                                            <span class="text-muted"><i class="bi bi-clock me-1"></i><?= htmlspecialchars($req['scheduled_time'] ?? '') ?></span>
+                                        </td>
+                                        <td>
+                                            <strong><?= htmlspecialchars($req['requisitioner_name'] ?? '') ?></strong><br>
+                                            <span class="badge bg-light text-dark border"><?= htmlspecialchars($req['department']) ?></span>
+                                        </td>
+                                        <td>
+                                            <?php
+                                            $st = $req['status'];
+                                            $stClass = ($st == 'Approved' || $st == 'Returned') ? 'order-badge-approved' : (($st == 'Rejected') ? 'order-badge-rejected' : 'order-badge-pending');
+                                            ?>
+                                            <span class="badge rounded-pill px-3 py-2 <?= $stClass ?>"><?= $st ?></span>
+                                        </td>
+                                        <td class="text-nowrap text-muted small"><?= date('Y-m-d H:i', strtotime($req['created_at'])) ?></td>
+                                        <td class="text-end">
+                                            <?php if($req['status'] == 'Rejected'): ?>
+                                                <button class="btn btn-sm btn-outline-danger rounded-pill px-3 delete-btn" onclick="deleteRequest('<?= $req['request_group_id'] ?>', 'borrow')"><i class="bi bi-trash me-1"></i>Delete</button>
+                                            <?php else: ?>
+                                                <button class="btn btn-sm btn-outline-secondary rounded-pill px-3" disabled><i class="bi bi-clock me-1"></i><?= $req['status'] ?></button>
                                             <?php endif; ?>
                                         </td>
                                     </tr>

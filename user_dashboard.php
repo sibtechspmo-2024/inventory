@@ -171,6 +171,9 @@ $maint_items = $conn->query("SELECT * FROM maintenance_items WHERE actual_stocks
             <a href="place_order.php" class="btn btn-warning btn-sm fw-bold rounded-pill px-3 me-1 text-dark">
                 <i class="bi bi-cart-plus-fill me-1"></i> Place Requests
             </a>
+            <a href="place_order.php?type=borrow" class="btn btn-info btn-sm fw-bold rounded-pill px-3 me-1 text-white">
+                <i class="bi bi-box-seam-fill me-1"></i> Borrow Items
+            </a>
             <a href="request_history.php" class="btn btn-outline-light btn-sm fw-semibold rounded-pill px-3 me-1">
                 <i class="bi bi-bag-check-fill me-1"></i> My Requests
             </a>

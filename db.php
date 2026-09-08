@@ -28,12 +28,25 @@ class SQLiteDBResult {
         }
         return null;
     }
+
+    public function fetch_all($mode = MYSQLI_ASSOC) {
+        return $this->rows;
+    }
+
+    public function data_seek($offset) {
+        if ($offset >= 0 && $offset < $this->num_rows) {
+            $this->pointer = $offset;
+            return true;
+        }
+        return false;
+    }
 }
 
 class SQLiteDBStmt {
     private $pdo;
     private $sql;
     private $params = [];
+    public $affected_rows = 0;
 
     public function __construct($pdo, $sql) {
         $this->pdo = $pdo;
@@ -47,7 +60,9 @@ class SQLiteDBStmt {
     public function execute() {
         try {
             $stmt = $this->pdo->prepare($this->sql);
-            return $stmt->execute($this->params);
+            $res = $stmt->execute($this->params);
+            $this->affected_rows = $stmt->rowCount();
+            return $res;
         } catch (\Exception $e) {
             return false;
         }
@@ -57,6 +72,7 @@ class SQLiteDBStmt {
         try {
             $stmt = $this->pdo->prepare($this->sql);
             $stmt->execute($this->params);
+            $this->affected_rows = $stmt->rowCount();
             return new SQLiteDBResult($stmt);
         } catch (\Exception $e) {
             return new SQLiteDBResult(null);
@@ -112,6 +128,22 @@ class SQLiteDBConn {
 
     public function escape_string($str) {
         return addslashes($str);
+    }
+
+    public function real_escape_string($str) {
+        return addslashes($str);
+    }
+
+    public function begin_transaction() {
+        return $this->pdo->beginTransaction();
+    }
+
+    public function commit() {
+        return $this->pdo->commit();
+    }
+
+    public function rollback() {
+        return $this->pdo->rollBack();
     }
 }
 

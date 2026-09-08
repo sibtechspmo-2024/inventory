@@ -55,13 +55,13 @@ if ($cal_stmt) {
 // Fetch user's own requests/orders schedules for list view and calendar display
 $user_schedules = [];
 
-// 1. Office supply schedules
+// 1. Office supply schedules (all users)
 $off_res = $conn->query("
-    SELECT r.request_group_id, r.date_needed, r.scheduled_time, r.purpose, r.status, r.quantity,
+    SELECT r.request_group_id, r.requisitioner_name, r.department, r.date_needed, r.scheduled_time, r.purpose, r.status, r.quantity,
            IFNULL(i.item_name, 'Item') as item_name
     FROM supply_requests r
     LEFT JOIN items i ON r.item_id = i.id
-    WHERE r.user_id = {$user_id} AND r.date_needed IS NOT NULL
+    WHERE r.date_needed IS NOT NULL
 ");
 if ($off_res) {
     $grouped_off = [];
@@ -74,6 +74,7 @@ if ($off_res) {
                 'type' => 'Office Supply Pickup',
                 'badge' => 'bg-primary',
                 'id' => $gid,
+                'requisitioner' => $r['requisitioner_name'] . ' (' . $r['department'] . ')',
                 'items' => [],
                 'status' => $r['status']
             ];
@@ -86,13 +87,13 @@ if ($off_res) {
     }
 }
 
-// 2. Maintenance supply schedules
+// 2. Maintenance supply schedules (all users)
 $mnt_res = $conn->query("
-    SELECT r.request_group_id, r.date_needed, r.scheduled_time, r.purpose, r.status, r.quantity,
+    SELECT r.request_group_id, r.requisitioner_name, r.department, r.date_needed, r.scheduled_time, r.purpose, r.status, r.quantity,
            IFNULL(m.item_name, 'Item') as item_name
     FROM maintenance_requests r
     LEFT JOIN maintenance_items m ON r.item_id = m.id
-    WHERE r.user_id = {$user_id} AND r.date_needed IS NOT NULL
+    WHERE r.date_needed IS NOT NULL
 ");
 if ($mnt_res) {
     $grouped_mnt = [];
@@ -105,6 +106,7 @@ if ($mnt_res) {
                 'type' => 'Maintenance Pickup',
                 'badge' => 'bg-warning text-dark',
                 'id' => $gid,
+                'requisitioner' => $r['requisitioner_name'] . ' (' . $r['department'] . ')',
                 'items' => [],
                 'status' => $r['status']
             ];
@@ -117,11 +119,11 @@ if ($mnt_res) {
     }
 }
 
-// 3. Document printing schedules
+// 3. Document printing schedules (all users)
 $prt_res = $conn->query("
-    SELECT request_group_id, date_needed, scheduled_time, paper_size, print_color, total_price, status
+    SELECT request_group_id, requisitioner_name, department, date_needed, scheduled_time, paper_size, print_color, total_price, status
     FROM document_printing_requests
-    WHERE user_id = {$user_id} AND date_needed IS NOT NULL
+    WHERE date_needed IS NOT NULL
 ");
 if ($prt_res) {
     while ($r = $prt_res->fetch_assoc()) {
@@ -131,19 +133,19 @@ if ($prt_res) {
             'type' => 'Document Printing Pickup',
             'badge' => 'bg-info text-white',
             'id' => $r['request_group_id'],
+            'requisitioner' => $r['requisitioner_name'] . ' (' . $r['department'] . ')',
             'items' => 'Doc Print (' . $r['paper_size'] . ', ' . $r['print_color'] . ') - ₱' . number_format($r['total_price'], 2),
             'status' => $r['status']
         ];
     }
 }
 
-// 4. Borrow requests schedules (borrow date & expected return date)
+// 4. Borrow requests schedules (all users)
 $brw_res = $conn->query("
-    SELECT r.request_group_id, r.borrow_date, r.expected_return_date, r.scheduled_time, r.quantity, r.status,
+    SELECT r.request_group_id, r.requisitioner_name, r.department, r.borrow_date, r.expected_return_date, r.scheduled_time, r.quantity, r.status,
            IFNULL(i.item_name, r.item_name) as item_title
     FROM borrow_requests r
     LEFT JOIN items i ON r.item_id = i.id AND r.item_id > 0
-    WHERE r.user_id = {$user_id}
 ");
 if ($brw_res) {
     while ($r = $brw_res->fetch_assoc()) {
@@ -153,6 +155,7 @@ if ($brw_res) {
             'type' => 'Borrow Start',
             'badge' => 'bg-secondary',
             'id' => $r['request_group_id'],
+            'requisitioner' => $r['requisitioner_name'] . ' (' . $r['department'] . ')',
             'items' => 'Borrow: ' . ($r['item_title'] ?? 'Equipment') . ' (x' . $r['quantity'] . ')',
             'status' => $r['status']
         ];
@@ -162,6 +165,7 @@ if ($brw_res) {
             'type' => 'Borrow Return Deadline',
             'badge' => 'bg-danger',
             'id' => $r['request_group_id'],
+            'requisitioner' => $r['requisitioner_name'] . ' (' . $r['department'] . ')',
             'items' => 'RETURN Item: ' . ($r['item_title'] ?? 'Equipment') . ' (x' . $r['quantity'] . ')',
             'status' => $r['status']
         ];
@@ -431,9 +435,9 @@ usort($user_schedules, function($a, $b) {
                         <!-- User Personal Order Schedules -->
                         <?php if ($has_user_content): ?>
                             <?php foreach ($user_month_schedules[$day] as $us): ?>
-                                <div class="marker-text-blue fw-bold bg-white p-1 rounded border border-primary-subtle shadow-sm mb-1">
+                                <div class="marker-text-blue fw-bold bg-white p-1 rounded border border-primary-subtle shadow-sm mb-1" title="<?= htmlspecialchars($us['requisitioner'] ?? '') ?>">
                                     <i class="bi bi-clock me-1"></i><?= htmlspecialchars($us['type']) ?>
-                                    <div style="font-size: 0.78rem;" class="text-dark fw-normal"><?= htmlspecialchars($us['time']) ?></div>
+                                    <div style="font-size: 0.78rem;" class="text-dark fw-normal"><?= htmlspecialchars($us['time']) ?> <?= !empty($us['requisitioner']) ? ' - ' . htmlspecialchars($us['requisitioner']) : '' ?></div>
                                 </div>
                             <?php endforeach; ?>
                         <?php endif; ?>
@@ -460,10 +464,10 @@ usort($user_schedules, function($a, $b) {
         </div>
     </div>
 
-    <!-- Personal Schedule Table Breakdown -->
+    <!-- All Scheduled Events Table Breakdown -->
     <div class="card border-0 shadow-sm rounded-4 overflow-hidden mb-4">
         <div class="card-header bg-light p-3 border-bottom d-flex justify-content-between align-items-center">
-            <h6 class="fw-bold mb-0 text-dark d-flex align-items-center"><i class="bi bi-clock-history me-2 text-primary"></i>Detailed List of My Scheduled Pickup & Deadlines</h6>
+            <h6 class="fw-bold mb-0 text-dark d-flex align-items-center"><i class="bi bi-clock-history me-2 text-primary"></i>Detailed List of All Scheduled Pickups & Deadlines</h6>
             <span class="badge bg-secondary"><?= count($user_schedules) ?> Total Items</span>
         </div>
         <div class="card-body p-0">
@@ -475,6 +479,7 @@ usort($user_schedules, function($a, $b) {
                             <th>Time Slot</th>
                             <th>Event / Request Type</th>
                             <th>Order ID</th>
+                            <th>Requisitioner & Dept</th>
                             <th>Details / Items</th>
                             <th>Status</th>
                         </tr>
@@ -487,6 +492,7 @@ usort($user_schedules, function($a, $b) {
                                     <td><span class="badge bg-light text-dark border"><?= htmlspecialchars($sched['time']) ?></span></td>
                                     <td><span class="badge <?= $sched['badge'] ?> fw-bold"><?= htmlspecialchars($sched['type']) ?></span></td>
                                     <td class="fw-bold text-logo-blue">#<?= htmlspecialchars($sched['id']) ?></td>
+                                    <td><span class="badge bg-light text-dark border fw-semibold"><?= htmlspecialchars($sched['requisitioner'] ?? 'N/A') ?></span></td>
                                     <td class="small text-dark fw-semibold"><?= htmlspecialchars($sched['items']) ?></td>
                                     <td>
                                         <?php
@@ -499,9 +505,9 @@ usort($user_schedules, function($a, $b) {
                             <?php endforeach; ?>
                         <?php else: ?>
                             <tr>
-                                <td colspan="6" class="text-center text-muted py-4">
+                                <td colspan="7" class="text-center text-muted py-4">
                                     <i class="bi bi-calendar-x fs-2 d-block mb-1 text-secondary"></i>
-                                    Walang nakaiskedyul na mga personal na gawain sa kasalukuyan.
+                                    Walang nakaiskedyul na mga gawain sa kasalukuyan.
                                 </td>
                             </tr>
                         <?php endif; ?>

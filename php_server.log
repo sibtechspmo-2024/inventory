@@ -51,3 +51,43 @@ Stack trace:
 [Tue Sep  8 00:27:05 2026] [::1]:59134 Closing
 [Tue Sep  8 00:27:05 2026] [::1]:59150 [200]: GET /logo.jpg
 [Tue Sep  8 00:27:05 2026] [::1]:59150 Closing
+[Tue Sep  8 00:47:20 2026] [::1]:53124 Accepted
+[Tue Sep  8 00:47:20 2026] [::1]:53124 [200]: GET /index.php
+[Tue Sep  8 00:47:20 2026] [::1]:53124 Closing
+[Tue Sep  8 00:47:20 2026] [::1]:53134 Accepted
+[Tue Sep  8 00:47:20 2026] [::1]:53146 Accepted
+[Tue Sep  8 00:47:20 2026] [::1]:53134 [404]: GET /css/index.css - No such file or directory
+[Tue Sep  8 00:47:20 2026] [::1]:53134 Closing
+[Tue Sep  8 00:47:20 2026] [::1]:53146 [200]: GET /logo.jpg
+[Tue Sep  8 00:47:20 2026] [::1]:53146 Closing
+[Tue Sep  8 00:47:21 2026] [::1]:53148 Accepted
+[Tue Sep  8 00:47:21 2026] [::1]:53148 [302]: POST /index.php
+[Tue Sep  8 00:47:21 2026] [::1]:53148 Closing
+[Tue Sep  8 00:47:21 2026] [::1]:53164 Accepted
+[Tue Sep  8 00:47:21 2026] PHP Fatal error:  Uncaught Error: Call to undefined method SQLiteDBResult::data_seek() in /app/admin_dashboard.php:781
+Stack trace:
+#0 {main}
+  thrown in /app/admin_dashboard.php on line 781
+[Tue Sep  8 00:47:21 2026] [::1]:53164 [200]: GET /admin_dashboard.php - Uncaught Error: Call to undefined method SQLiteDBResult::data_seek() in /app/admin_dashboard.php:781
+Stack trace:
+#0 {main}
+  thrown in /app/admin_dashboard.php on line 781
+[Tue Sep  8 00:47:21 2026] [::1]:53164 Closing
+[Tue Sep  8 00:47:21 2026] [::1]:53176 Accepted
+[Tue Sep  8 00:47:21 2026] [::1]:53182 Accepted
+[Tue Sep  8 00:47:21 2026] [::1]:53176 [404]: GET /css/admin_dashboard.css - No such file or directory
+[Tue Sep  8 00:47:21 2026] [::1]:53176 Closing
+[Tue Sep  8 00:47:21 2026] [::1]:53182 [200]: GET /logo.jpg
+[Tue Sep  8 00:47:21 2026] [::1]:53182 Closing
+[Tue Sep  8 00:47:22 2026] [::1]:53196 Accepted
+[Tue Sep  8 00:47:22 2026] [::1]:53196 [302]: GET /user_schedule.php
+[Tue Sep  8 00:47:22 2026] [::1]:53196 Closing
+[Tue Sep  8 00:47:22 2026] [::1]:53204 Accepted
+[Tue Sep  8 00:47:22 2026] [::1]:53204 [200]: GET /index.php
+[Tue Sep  8 00:47:22 2026] [::1]:53204 Closing
+[Tue Sep  8 00:47:22 2026] [::1]:53214 Accepted
+[Tue Sep  8 00:47:22 2026] [::1]:53220 Accepted
+[Tue Sep  8 00:47:22 2026] [::1]:53214 [404]: GET /css/index.css - No such file or directory
+[Tue Sep  8 00:47:22 2026] [::1]:53214 Closing
+[Tue Sep  8 00:47:22 2026] [::1]:53220 [200]: GET /logo.jpg
+[Tue Sep  8 00:47:22 2026] [::1]:53220 Closing

@@ -327,19 +327,31 @@ $maint_requests = $conn->query("
     ORDER BY max_id DESC
 ");
 
-$print_requests = $conn->query("
+$print_requests_list = [];
+$print_requests_res = $conn->query("
     SELECT id, user_id, request_group_id, requisitioner_name, department, document_file, paper_size, print_color, print_sides, binding_option, page_count, copies, total_price, purpose, date_needed, scheduled_time, status, created_at
     FROM document_printing_requests
     ORDER BY id DESC
 ");
+if ($print_requests_res) {
+    while ($p_row = $print_requests_res->fetch_assoc()) {
+        $print_requests_list[] = $p_row;
+    }
+}
 
-$borrow_requests = $conn->query("
+$borrow_requests_list = [];
+$borrow_requests_res = $conn->query("
     SELECT r.id, r.request_group_id, r.requisitioner_name, r.department, r.quantity, r.borrow_date, r.expected_return_date, r.scheduled_time, r.purpose, r.status, r.created_at,
            IFNULL(i.item_name, r.item_name) as item_name
     FROM borrow_requests r
     LEFT JOIN items i ON r.item_id = i.id AND r.item_id > 0
     ORDER BY r.id DESC
 ");
+if ($borrow_requests_res) {
+    while ($b_row = $borrow_requests_res->fetch_assoc()) {
+        $borrow_requests_list[] = $b_row;
+    }
+}
 
 $res_b = $conn->query("SELECT COUNT(*) as cnt FROM borrow_requests WHERE status = 'Pending'");
 $row_b = $res_b ? $res_b->fetch_assoc() : null;
@@ -531,6 +543,11 @@ $is_req_hist = isset($_GET['req_status']) || isset($_GET['req_cat']);
                     </button>
                 </li>
                 <li class="nav-item">
+                    <button class="nav-link border-0 text-dark fw-bold px-3 py-2" id="print-req-tab" data-bs-toggle="tab" data-bs-target="#print-req" type="button">
+                        <i class="fa-solid fa-print me-2"></i>Document Printing (<?= $print_pending_count ?>)
+                    </button>
+                </li>
+                <li class="nav-item">
                     <button class="nav-link border-0 text-dark fw-bold px-3 py-2" id="calendar-tab" data-bs-toggle="tab" data-bs-target="#calendar-view" type="button">
                         <i class="fa-solid fa-calendar-days me-2"></i>Scheduling & Calendar
                     </button>
@@ -612,8 +629,8 @@ $is_req_hist = isset($_GET['req_status']) || isset($_GET['req_cat']);
                             </tr>
                         </thead>
                         <tbody>
-                            <?php if ($borrow_requests && $borrow_requests->num_rows > 0): ?>
-                                <?php while($b = $borrow_requests->fetch_assoc()): ?>
+                            <?php if (!empty($borrow_requests_list)): ?>
+                                <?php foreach ($borrow_requests_list as $b): ?>
                                     <tr>
                                         <td class="fw-bold text-logo-blue">#<?= htmlspecialchars($b['request_group_id']) ?></td>
                                         <td>
@@ -659,7 +676,7 @@ $is_req_hist = isset($_GET['req_status']) || isset($_GET['req_cat']);
                                             </div>
                                         </td>
                                     </tr>
-                                <?php endwhile; ?>
+                                <?php endforeach; ?>
                             <?php else: ?>
                                 <tr>
                                     <td colspan="7" class="text-center text-muted py-4">Walang borrow requests.</td>
@@ -777,34 +794,28 @@ $is_req_hist = isset($_GET['req_status']) || isset($_GET['req_cat']);
                             $all_schedules = [];
 
                             // Borrow return schedules
-                            if ($borrow_requests) {
-                                $borrow_requests->data_seek(0);
-                                while ($b = $borrow_requests->fetch_assoc()) {
-                                    $all_schedules[] = [
-                                        'date' => $b['expected_return_date'],
-                                        'time' => $b['scheduled_time'] ?? '09:00 AM - 10:00 AM',
-                                        'type' => 'Borrow Return Deadline',
-                                        'id' => $b['request_group_id'],
-                                        'req' => $b['requisitioner_name'] . ' (' . $b['department'] . ')',
-                                        'details' => 'Return item: ' . $b['item_name'] . ' (x' . $b['quantity'] . ') - Status: ' . $b['status']
-                                    ];
-                                }
+                            foreach ($borrow_requests_list as $b) {
+                                $all_schedules[] = [
+                                    'date' => $b['expected_return_date'],
+                                    'time' => $b['scheduled_time'] ?? '09:00 AM - 10:00 AM',
+                                    'type' => 'Borrow Return Deadline',
+                                    'id' => $b['request_group_id'],
+                                    'req' => $b['requisitioner_name'] . ' (' . $b['department'] . ')',
+                                    'details' => 'Return item: ' . $b['item_name'] . ' (x' . $b['quantity'] . ') - Status: ' . $b['status']
+                                ];
                             }
 
                             // Printing schedules
-                            if ($print_requests) {
-                                $print_requests->data_seek(0);
-                                while ($p = $print_requests->fetch_assoc()) {
-                                    if (!empty($p['date_needed'])) {
-                                        $all_schedules[] = [
-                                            'date' => $p['date_needed'],
-                                            'time' => $p['scheduled_time'] ?? '09:00 AM - 10:00 AM',
-                                            'type' => 'Document Printing Pickup',
-                                            'id' => $p['request_group_id'],
-                                            'req' => $p['requisitioner_name'] . ' (' . $p['department'] . ')',
-                                            'details' => 'Document Print (' . $p['paper_size'] . ', ' . $p['print_color'] . ') - Status: ' . $p['status']
-                                        ];
-                                    }
+                            foreach ($print_requests_list as $p) {
+                                if (!empty($p['date_needed'])) {
+                                    $all_schedules[] = [
+                                        'date' => $p['date_needed'],
+                                        'time' => $p['scheduled_time'] ?? '09:00 AM - 10:00 AM',
+                                        'type' => 'Document Printing Pickup',
+                                        'id' => $p['request_group_id'],
+                                        'req' => $p['requisitioner_name'] . ' (' . $p['department'] . ')',
+                                        'details' => 'Document Print (' . $p['paper_size'] . ', ' . $p['print_color'] . ') - Status: ' . $p['status']
+                                    ];
                                 }
                             }
 
@@ -856,13 +867,8 @@ $is_req_hist = isset($_GET['req_status']) || isset($_GET['req_cat']);
                             </tr>
                         </thead>
                         <tbody>
-                            <?php
-                            if ($print_requests) {
-                                $print_requests->data_seek(0);
-                            }
-                            if ($print_requests && $print_requests->num_rows > 0):
-                            ?>
-                                <?php while($p = $print_requests->fetch_assoc()): ?>
+                            <?php if (!empty($print_requests_list)): ?>
+                                <?php foreach ($print_requests_list as $p): ?>
                                     <tr>
                                         <td class="fw-bold text-logo-blue">#<?= htmlspecialchars($p['request_group_id']) ?></td>
                                         <td>
@@ -921,7 +927,7 @@ $is_req_hist = isset($_GET['req_status']) || isset($_GET['req_cat']);
                                             </div>
                                         </td>
                                     </tr>
-                                <?php endwhile; ?>
+                                <?php endforeach; ?>
                             <?php else: ?>
                                 <tr>
                                     <td colspan="7" class="text-center text-muted py-4">Walang document printing requests.</td>

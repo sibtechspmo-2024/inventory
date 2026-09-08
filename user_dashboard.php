@@ -171,6 +171,12 @@ $maint_items = $conn->query("SELECT * FROM maintenance_items WHERE actual_stocks
             <a href="place_order.php" class="btn btn-warning btn-sm fw-bold rounded-pill px-3 me-1 text-dark">
                 <i class="bi bi-cart-plus-fill me-1"></i> Place Requests
             </a>
+            <a href="borrow_items.php" class="btn btn-info btn-sm fw-bold rounded-pill px-3 me-1 text-white">
+                <i class="bi bi-hand-holding-box me-1"></i> Borrow Items
+            </a>
+            <a href="user_schedule.php" class="btn btn-light btn-sm fw-bold rounded-pill px-3 me-1 text-primary">
+                <i class="bi bi-calendar3 me-1"></i> My Schedule & Calendar
+            </a>
             <a href="request_history.php" class="btn btn-outline-light btn-sm fw-semibold rounded-pill px-3 me-1">
                 <i class="bi bi-bag-check-fill me-1"></i> My Requests
             </a>
@@ -194,7 +200,7 @@ $maint_items = $conn->query("SELECT * FROM maintenance_items WHERE actual_stocks
             <div class="col-lg-7 mb-3 mb-lg-0">
                 <span class="badge bg-warning text-dark fw-extrabold mb-2 px-3 py-1 rounded-pill text-uppercase shadow-sm" style="letter-spacing: 0.5px;">Central Supply Room</span>
                 <h2 class="mb-2">Select supply </h2>
-              
+
             </div>
             <div class="col-lg-5">
                 <div class="input-group hero-search-box">
@@ -221,6 +227,10 @@ $maint_items = $conn->query("SELECT * FROM maintenance_items WHERE actual_stocks
 
                             <input type="radio" class="btn-check" name="request_type" id="cat_maint" value="maintenance" onchange="switchCategory('maintenance')">
                             <label class="btn category-pill" for="cat_maint"><i class="bi bi-tools me-1"></i>Maintenance Supplies</label>
+
+                            <a href="place_order.php?type=document_printing" class="btn category-pill"><i class="bi bi-printer me-1"></i>Document Printing</a>
+                            <a href="borrow_items.php" class="btn category-pill"><i class="bi bi-hand-holding me-1"></i>Borrow Equipment</a>
+                            <a href="user_schedule.php" class="btn category-pill"><i class="bi bi-calendar-event me-1"></i>My Calendar</a>
                         </div>
                     </div>
                     <span class="badge bg-primary text-white border-0 px-3 py-2 fw-bold" id="available-count-badge"><i class="bi bi-check-circle-fill me-1"></i>Available Items</span>

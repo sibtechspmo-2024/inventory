@@ -23,61 +23,172 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['request_supply'])) {
     $department = trim($_POST['department'] ?? '');
     $purpose = trim($_POST['purpose'] ?? '');
     $date_needed = $_POST['date_needed'] ?? null;
+    $scheduled_time = trim($_POST['scheduled_time'] ?? '09:00 AM - 10:00 AM');
+
+    if ($request_type === 'document_printing') {
+        try {
+            $paper_size = $_POST['paper_size'] ?? 'A4';
+            $print_color = $_POST['print_color'] ?? 'Black & White';
+            $print_sides = $_POST['print_sides'] ?? 'Single-sided';
+            $binding_option = $_POST['binding_option'] ?? 'None';
+            $page_count = intval($_POST['page_count'] ?? 1);
+            $copies = intval($_POST['copies'] ?? 1);
+            $total_price = floatval($_POST['total_price'] ?? 0);
+
+            $document_file = '';
+            if (isset($_FILES['document_file']) && $_FILES['document_file']['error'] === UPLOAD_ERR_OK) {
+                $fileTmpPath = $_FILES['document_file']['tmp_name'];
+                $fileName = $_FILES['document_file']['name'];
+                $fileExtension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+
+                $allowedExtensions = ['pdf', 'doc', 'docx', 'png', 'jpg', 'jpeg'];
+                if (in_array($fileExtension, $allowedExtensions)) {
+                    $uploadFileDir = 'uploads/';
+                    if (!is_dir($uploadFileDir)) {
+                        mkdir($uploadFileDir, 0755, true);
+                    }
+                    $newFileName = 'DOC-' . date('YmdHis') . '-' . rand(1000, 9999) . '.' . $fileExtension;
+                    $dest_path = $uploadFileDir . $newFileName;
+
+                    if (move_uploaded_file($fileTmpPath, $dest_path)) {
+                        $document_file = $newFileName;
+                    } else {
+                        throw new Exception("Nagkaroon ng problema sa pag-upload ng file.");
+                    }
+                } else {
+                    throw new Exception("Hindi pinahihintulutan ang format ng file na ito. Gumamit ng PDF, DOC, DOCX, PNG, o JPG.");
+                }
+            } else {
+                throw new Exception("Mangyaring mag-upload ng document file na ipapaprint.");
+            }
+
+            $request_group_id = 'PRT-' . date('YmdHis') . '-' . rand(100, 999);
+
+            $stmt = $conn->prepare("INSERT INTO document_printing_requests (user_id, request_group_id, requisitioner_name, department, document_file, paper_size, print_color, print_sides, binding_option, page_count, copies, total_price, purpose, date_needed, scheduled_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->bind_param("issssssssiddsss", $user_id, $request_group_id, $requisitioner_name, $department, $document_file, $paper_size, $print_color, $print_sides, $binding_option, $page_count, $copies, $total_price, $purpose, $date_needed, $scheduled_time);
+
+            if ($stmt->execute()) {
+                echo json_encode([
+                    'status' => 'success',
+                    'message' => "Matagumpay na naisumite ang iyong Document Printing request ($request_group_id)!",
+                    'group_id' => $request_group_id
+                ]);
+                exit;
+            } else {
+                throw new Exception("Hindi naipasa sa database ang request: " . $stmt->error);
+            }
+
+        } catch (Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+            exit;
+        }
+    }
 
     $item_ids = $_POST['item_id'] ?? [];
     $quantities = $_POST['quantity'] ?? [];
 
     if (!empty($item_ids) && is_array($item_ids)) {
-        $prefix = ($request_type === 'maintenance') ? 'MNT-' : 'REQ-';
-        $request_group_id = $prefix . date('YmdHis') . '-' . rand(100, 999);
+        if ($request_type === 'borrow') {
+            $prefix = 'BRW-';
+            $request_group_id = $prefix . date('YmdHis') . '-' . rand(100, 999);
+            $borrow_date = $_POST['borrow_date'] ?? $date_needed ?? date('Y-m-d');
+            $expected_return_date = $_POST['expected_return_date'] ?? date('Y-m-d', strtotime('+3 days'));
 
-        $request_table = ($request_type === 'maintenance') ? 'maintenance_requests' : 'supply_requests';
-        $item_table = ($request_type === 'maintenance') ? 'maintenance_items' : 'items';
+            $stmt = $conn->prepare("INSERT INTO borrow_requests (request_group_id, user_id, requisitioner_name, department, item_id, quantity, borrow_date, expected_return_date, scheduled_time, purpose) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $check_stock_stmt = $conn->prepare("SELECT actual_stocks, item_name FROM items WHERE id = ?");
 
-        $stmt = $conn->prepare("INSERT INTO {$request_table} (request_group_id, user_id, requisitioner_name, department, item_id, quantity, purpose, date_needed) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-        $check_stock_stmt = $conn->prepare("SELECT actual_stocks, item_name FROM {$item_table} WHERE id = ?");
+            $inserted_count = 0;
+            $conn->begin_transaction();
 
-        $inserted_count = 0;
-        $conn->begin_transaction();
+            try {
+                foreach ($item_ids as $index => $item_id) {
+                    $item_id = intval($item_id);
+                    $qty = intval($quantities[$index] ?? 0);
 
-        try {
-            foreach ($item_ids as $index => $item_id) {
-                $item_id = intval($item_id);
-                $qty = intval($quantities[$index] ?? 0);
+                    if ($item_id > 0 && $qty > 0) {
+                        $check_stock_stmt->bind_param("i", $item_id);
+                        $check_stock_stmt->execute();
+                        $chk_res = $check_stock_stmt->get_result()->fetch_assoc();
 
-                if ($item_id > 0 && $qty > 0) {
-                    $check_stock_stmt->bind_param("i", $item_id);
-                    $check_stock_stmt->execute();
-                    $chk_res = $check_stock_stmt->get_result()->fetch_assoc();
+                        if (!$chk_res || $chk_res['actual_stocks'] < $qty) {
+                            $iname = $chk_res['item_name'] ?? 'Selected Item';
+                            throw new Exception("Kulang ang available stock para sa hihiraming item na: " . $iname);
+                        }
 
-                    if (!$chk_res || $chk_res['actual_stocks'] < $qty) {
-                        $iname = $chk_res['item_name'] ?? 'Selected Item';
-                        throw new Exception("Kulang ang available stock para sa item na: " . $iname);
+                        $stmt->bind_param("sissiissss", $request_group_id, $user_id, $requisitioner_name, $department, $item_id, $qty, $borrow_date, $expected_return_date, $scheduled_time, $purpose);
+                        $stmt->execute();
+                        $inserted_count++;
                     }
-
-                    $stmt->bind_param("sississs", $request_group_id, $user_id, $requisitioner_name, $department, $item_id, $qty, $purpose, $date_needed);
-                    $stmt->execute();
-                    $inserted_count++;
                 }
-            }
 
-            if ($inserted_count > 0) {
-                $conn->commit();
-
-                echo json_encode([
-                    'status' => 'success',
-                    'message' => "Matagumpay na naisumite ang iyong " . ucfirst($request_type) . " request ($request_group_id)!",
-                    'group_id' => $request_group_id
-                ]);
+                if ($inserted_count > 0) {
+                    $conn->commit();
+                    echo json_encode([
+                        'status' => 'success',
+                        'message' => "Matagumpay na naisumite ang iyong Borrow request ($request_group_id)!",
+                        'group_id' => $request_group_id
+                    ]);
+                    exit;
+                } else {
+                    throw new Exception("Walang valid na item na naisumite.");
+                }
+            } catch (Exception $e) {
+                $conn->rollback();
+                echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
                 exit;
-            } else {
-                throw new Exception("Walang valid na item na naisumite.");
             }
+        } else {
+            $prefix = ($request_type === 'maintenance') ? 'MNT-' : 'REQ-';
+            $request_group_id = $prefix . date('YmdHis') . '-' . rand(100, 999);
 
-        } catch (Exception $e) {
-            $conn->rollback();
-            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
-            exit;
+            $request_table = ($request_type === 'maintenance') ? 'maintenance_requests' : 'supply_requests';
+            $item_table = ($request_type === 'maintenance') ? 'maintenance_items' : 'items';
+
+            $stmt = $conn->prepare("INSERT INTO {$request_table} (request_group_id, user_id, requisitioner_name, department, item_id, quantity, purpose, date_needed, scheduled_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $check_stock_stmt = $conn->prepare("SELECT actual_stocks, item_name FROM {$item_table} WHERE id = ?");
+
+            $inserted_count = 0;
+            $conn->begin_transaction();
+
+            try {
+                foreach ($item_ids as $index => $item_id) {
+                    $item_id = intval($item_id);
+                    $qty = intval($quantities[$index] ?? 0);
+
+                    if ($item_id > 0 && $qty > 0) {
+                        $check_stock_stmt->bind_param("i", $item_id);
+                        $check_stock_stmt->execute();
+                        $chk_res = $check_stock_stmt->get_result()->fetch_assoc();
+
+                        if (!$chk_res || $chk_res['actual_stocks'] < $qty) {
+                            $iname = $chk_res['item_name'] ?? 'Selected Item';
+                            throw new Exception("Kulang ang available stock para sa item na: " . $iname);
+                        }
+
+                        $stmt->bind_param("sississss", $request_group_id, $user_id, $requisitioner_name, $department, $item_id, $qty, $purpose, $date_needed, $scheduled_time);
+                        $stmt->execute();
+                        $inserted_count++;
+                    }
+                }
+
+                if ($inserted_count > 0) {
+                    $conn->commit();
+
+                    echo json_encode([
+                        'status' => 'success',
+                        'message' => "Matagumpay na naisumite ang iyong " . ucfirst($request_type) . " request ($request_group_id)!",
+                        'group_id' => $request_group_id
+                    ]);
+                    exit;
+                } else {
+                    throw new Exception("Walang valid na item na naisumite.");
+                }
+
+            } catch (Exception $e) {
+                $conn->rollback();
+                echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+                exit;
+            }
         }
     }
 
@@ -148,7 +259,7 @@ $maint_items = $conn->query("SELECT * FROM maintenance_items WHERE actual_stocks
         </div>
 
         <div class="card-body p-4">
-            <form id="placeOrderForm">
+            <form id="placeOrderForm" enctype="multipart/form-data">
                 <input type="hidden" name="request_supply" value="1">
 
                 <div class="row g-3 mb-4">
@@ -157,6 +268,8 @@ $maint_items = $conn->query("SELECT * FROM maintenance_items WHERE actual_stocks
                         <select name="request_type" id="request_type" class="form-select fw-semibold" onchange="onCategoryChange()">
                             <option value="office">Office Supplies Requisition</option>
                             <option value="maintenance">Maintenance Supplies Requisition</option>
+                            <option value="document_printing">Document Printing Requisition</option>
+                            <option value="borrow">Borrow Equipment / Items Requisition</option>
                         </select>
                     </div>
                     <div class="col-md-6">
@@ -172,14 +285,97 @@ $maint_items = $conn->query("SELECT * FROM maintenance_items WHERE actual_stocks
                         <input type="text" name="purpose" class="form-control fw-semibold" required placeholder="">
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label fw-semibold text-dark">Date Needed</label>
+                        <label class="form-label fw-semibold text-dark">Scheduled Date Needed</label>
                         <input type="date" name="date_needed" class="form-control fw-semibold" required>
+                    </div>
+                    <div class="col-md-12 d-none" id="borrow_dates_section">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold text-dark"><i class="bi bi-calendar-event me-1 text-primary"></i>Borrow Start Date</label>
+                                <input type="date" name="borrow_date" id="borrow_date" class="form-control fw-semibold">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold text-dark"><i class="bi bi-calendar-check me-1 text-primary"></i>Expected Return Date</label>
+                                <input type="date" name="expected_return_date" id="expected_return_date" class="form-control fw-semibold">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-12">
+                        <label class="form-label fw-semibold text-dark"><i class="bi bi-clock-history me-1 text-primary"></i>Scheduled Time Slot / Preferred Pickup</label>
+                        <select name="scheduled_time" class="form-select fw-semibold" required>
+                            <option value="08:00 AM - 09:00 AM">08:00 AM - 09:00 AM (Early Morning)</option>
+                            <option value="09:00 AM - 10:00 AM" selected>09:00 AM - 10:00 AM (Morning Slot 1)</option>
+                            <option value="10:00 AM - 11:00 AM">10:00 AM - 11:00 AM (Morning Slot 2)</option>
+                            <option value="11:00 AM - 12:00 PM">11:00 AM - 12:00 PM (Late Morning)</option>
+                            <option value="01:00 PM - 02:00 PM">01:00 PM - 02:00 PM (Early Afternoon)</option>
+                            <option value="02:00 PM - 03:00 PM">02:00 PM - 03:00 PM (Afternoon Slot 1)</option>
+                            <option value="03:00 PM - 04:00 PM">03:00 PM - 04:00 PM (Afternoon Slot 2)</option>
+                            <option value="04:00 PM - 05:00 PM">04:00 PM - 05:00 PM (Late Afternoon)</option>
+                        </select>
                     </div>
                 </div>
 
                 <hr class="my-4 text-secondary opacity-25">
 
+                <!-- DOCUMENT PRINTING SECTION -->
+                <div id="printing_section" class="d-none">
+                    <h5 class="fw-bold text-dark mb-3"><i class="bi bi-printer-fill text-primary me-2"></i>Document Printing Details</h5>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-12">
+                            <label class="form-label fw-semibold text-dark">Upload Document File (PDF, DOCX, PNG, JPG)</label>
+                            <input type="file" name="document_file" id="document_file" class="form-control fw-semibold" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold text-dark">Paper Size</label>
+                            <select name="paper_size" id="paper_size" class="form-select fw-semibold" onchange="calculatePrice()">
+                                <option value="Short">Short (8.5 x 11)</option>
+                                <option value="A4" selected>A4 (8.27 x 11.69)</option>
+                                <option value="Long">Long (8.5 x 13)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold text-dark">Print Color</label>
+                            <select name="print_color" id="print_color" class="form-select fw-semibold" onchange="calculatePrice()">
+                                <option value="Black & White" selected>Black & White (₱2.00 / page)</option>
+                                <option value="Colored">Colored (₱5.00 / page)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold text-dark">Print Side Option</label>
+                            <select name="print_sides" id="print_sides" class="form-select fw-semibold" onchange="calculatePrice()">
+                                <option value="Single-sided" selected>Single-sided</option>
+                                <option value="Double-sided">Double-sided (10% discount)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold text-dark">Binding Option</label>
+                            <select name="binding_option" id="binding_option" class="form-select fw-semibold" onchange="calculatePrice()">
+                                <option value="None" selected>None (₱0.00)</option>
+                                <option value="Stapled">Stapled (₱5.00)</option>
+                                <option value="Ring Bound">Ring Bound (₱35.00)</option>
+                                <option value="Hardbound">Hardbound (₱150.00)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold text-dark">Total Pages Per Copy</label>
+                            <input type="number" name="page_count" id="page_count" class="form-control fw-semibold" value="1" min="1" oninput="calculatePrice()">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold text-dark">Number of Copies</label>
+                            <input type="number" name="copies" id="copies" class="form-control fw-semibold" value="1" min="1" oninput="calculatePrice()">
+                        </div>
+                    </div>
+
+                    <div class="p-3 bg-light rounded-3 border d-flex align-items-center justify-content-between mb-4">
+                        <span class="fw-bold text-dark fs-5"><i class="bi bi-calculator me-2 text-primary"></i>Estimated Total Price:</span>
+                        <span class="fs-4 fw-extrabold text-primary" id="price_display">₱2.00</span>
+                        <input type="hidden" name="total_price" id="total_price_input" value="2.00">
+                    </div>
+                </div>
+
                 <!-- ADD ITEM CONTROLS -->
+                <div id="supply_section">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5 class="fw-bold text-dark mb-0"><i class="bi bi-box-seam text-primary me-2"></i>Request Items List</h5>
                     <button type="button" class="btn btn-outline-primary btn-sm rounded-pill fw-bold px-3" onclick="showAddItemModal()">
@@ -202,7 +398,7 @@ $maint_items = $conn->query("SELECT * FROM maintenance_items WHERE actual_stocks
                             <tr id="empty-row">
                                 <td colspan="5" class="text-center text-muted py-4">
                                     <i class="bi bi-basket fs-3 d-block text-secondary mb-1"></i>
-                                    No selected items please click<strong>Add Item</strong> 
+                                    No selected items please click<strong>Add Item</strong>
                                 </td>
                             </tr>
                         </tbody>
@@ -262,9 +458,55 @@ function getActiveCatalog() {
     return (type === 'maintenance') ? maintItemsData : officeItemsData;
 }
 
+function calculatePrice() {
+    const printColor = document.getElementById('print_color') ? document.getElementById('print_color').value : 'Black & White';
+    const printSides = document.getElementById('print_sides') ? document.getElementById('print_sides').value : 'Single-sided';
+    const bindingOption = document.getElementById('binding_option') ? document.getElementById('binding_option').value : 'None';
+    const pageCount = Math.max(1, parseInt(document.getElementById('page_count')?.value) || 1);
+    const copies = Math.max(1, parseInt(document.getElementById('copies')?.value) || 1);
+
+    let perPageRate = (printColor === 'Colored') ? 5.00 : 2.00;
+    let sideDiscount = (printSides === 'Double-sided') ? 0.90 : 1.00;
+
+    let bindingFee = 0.00;
+    if (bindingOption === 'Stapled') bindingFee = 5.00;
+    else if (bindingOption === 'Ring Bound') bindingFee = 35.00;
+    else if (bindingOption === 'Hardbound') bindingFee = 150.00;
+
+    let total = ((perPageRate * sideDiscount * pageCount) + bindingFee) * copies;
+
+    const displayElem = document.getElementById('price_display');
+    const inputElem = document.getElementById('total_price_input');
+    if (displayElem) displayElem.textContent = '₱' + total.toFixed(2);
+    if (inputElem) inputElem.value = total.toFixed(2);
+}
+
 function onCategoryChange() {
-    selectedItems = {};
-    renderTable();
+    const category = document.getElementById('request_type').value;
+    const printingSection = document.getElementById('printing_section');
+    const supplySection = document.getElementById('supply_section');
+    const borrowDatesSection = document.getElementById('borrow_dates_section');
+    const submitBtn = document.getElementById('submitOrderBtn');
+
+    if (borrowDatesSection) {
+        if (category === 'borrow') {
+            borrowDatesSection.classList.remove('d-none');
+        } else {
+            borrowDatesSection.classList.add('d-none');
+        }
+    }
+
+    if (category === 'document_printing') {
+        if (printingSection) printingSection.classList.remove('d-none');
+        if (supplySection) supplySection.classList.add('d-none');
+        if (submitBtn) submitBtn.disabled = false;
+        calculatePrice();
+    } else {
+        if (printingSection) printingSection.classList.add('d-none');
+        if (supplySection) supplySection.classList.remove('d-none');
+        selectedItems = {};
+        renderTable();
+    }
 }
 
 function loadCartFromStorage() {

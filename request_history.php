@@ -102,9 +102,10 @@ $office_requests = $conn->query("
 ");
 
 $borrow_requests = $conn->query("
-    SELECT r.id, r.request_group_id, r.requisitioner_name, r.department, r.quantity, r.borrow_date, r.expected_return_date, r.scheduled_time, r.purpose, r.status, r.created_at, i.item_name
+    SELECT r.id, r.request_group_id, r.requisitioner_name, r.department, r.quantity, r.borrow_date, r.expected_return_date, r.scheduled_time, r.purpose, r.status, r.created_at,
+           IFNULL(i.item_name, r.item_name) as item_name
     FROM borrow_requests r
-    JOIN items i ON r.item_id = i.id
+    LEFT JOIN items i ON r.item_id = i.id AND r.item_id > 0
     WHERE r.user_id = {$user_id}
     ORDER BY r.created_at DESC
 ");

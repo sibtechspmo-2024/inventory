@@ -76,7 +76,7 @@ if ($prt_res) {
     }
 }
 
-// 4. Borrow requests schedules (all users)
+// 2. Borrow requests schedules (all users)
 $brw_res = $conn->query("
     SELECT r.request_group_id, r.requisitioner_name, r.department, r.borrow_date, r.expected_return_date, r.scheduled_time, r.quantity, r.status,
            IFNULL(i.item_name, r.item_name) as item_title
@@ -115,6 +115,38 @@ foreach ($user_schedules as $us) {
     if (date('Y', $us_time) == $year && date('m', $us_time) == $month) {
         $day_num = intval(date('j', $us_time));
         $user_month_schedules[$day_num][] = $us;
+    }
+}
+
+// Combine all day events into a consolidated structure for breakdown and modal preview
+$day_events_map = [];
+for ($d = 1; $d <= $days_in_month; $d++) {
+    $day_events_map[$d] = [];
+    if (isset($admin_schedules[$d])) {
+        foreach ($admin_schedules[$d] as $as) {
+            $day_events_map[$d][] = [
+                'category' => 'Admin Posting',
+                'title' => ($as['department'] ? $as['department'] . ' ' : '') . $as['title'],
+                'time' => $as['scheduled_time'] ?? 'All Day',
+                'details' => $as['details'] ?? '',
+                'requisitioner' => $as['department'] ?? 'Admin Posting',
+                'badge' => 'bg-danger text-white',
+                'is_admin' => true
+            ];
+        }
+    }
+    if (isset($user_month_schedules[$d])) {
+        foreach ($user_month_schedules[$d] as $us) {
+            $day_events_map[$d][] = [
+                'category' => $us['type'],
+                'title' => $us['items'],
+                'time' => $us['time'],
+                'details' => 'Order #' . $us['id'] . ' (' . $us['status'] . ')',
+                'requisitioner' => $us['requisitioner'] ?? 'N/A',
+                'badge' => 'bg-primary text-white',
+                'is_admin' => false
+            ];
+        }
     }
 }
 
@@ -190,7 +222,7 @@ usort($user_schedules, function($a, $b) {
 
         .whiteboard-cell {
             background: #fcfbfa;
-            min-height: 110px;
+            min-height: 125px;
             padding: 6px;
             position: relative;
             display: flex;
@@ -198,11 +230,18 @@ usort($user_schedules, function($a, $b) {
             justify-content: flex-start;
             overflow: hidden;
             box-shadow: inset 0 0 5px rgba(0,0,0,0.02);
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .whiteboard-cell:hover {
+            background-color: #f7f4e9;
         }
 
         .whiteboard-cell.empty {
             background: #f3efe6;
             opacity: 0.6;
+            cursor: default;
         }
 
         .whiteboard-date-num {
@@ -210,37 +249,50 @@ usort($user_schedules, function($a, $b) {
             color: #dc2626; /* Marker red */
             font-size: 1.35rem;
             line-height: 1;
-            margin-bottom: 4px;
+            margin-bottom: 6px;
         }
 
-        .marker-text-red {
+        .marker-badge-red {
             font-family: 'Permanent Marker', 'Caveat', cursive;
-            color: #c51d1d;
-            font-size: 1rem;
-            line-height: 1.15;
-            word-break: break-word;
-            text-shadow: 0.5px 0.5px 0px rgba(197, 29, 29, 0.2);
+            color: #b91c1c;
+            background: rgba(220, 38, 38, 0.08);
+            border-left: 3px solid #dc2626;
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-size: 0.88rem;
+            line-height: 1.2;
+            margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
-        .marker-text-blue {
+        .marker-badge-blue {
             font-family: 'Permanent Marker', 'Caveat', cursive;
             color: #1d4ed8;
-            font-size: 0.95rem;
-            line-height: 1.15;
-            word-break: break-word;
-        }
-
-        .marker-text-dark {
-            font-family: 'Permanent Marker', 'Caveat', cursive;
-            color: #111827;
-            font-size: 0.95rem;
-            line-height: 1.15;
-        }
-
-        .whiteboard-cell .schedule-item {
+            background: rgba(29, 78, 216, 0.08);
+            border-left: 3px solid #2563eb;
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            line-height: 1.2;
             margin-bottom: 4px;
-            padding: 2px 4px;
-            border-radius: 3px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .more-schedules-badge {
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: #1b4f9c;
+            background: #e0e7ff;
+            border-radius: 12px;
+            padding: 2px 8px;
+            display: inline-block;
+            margin-top: auto;
+            text-align: center;
+            align-self: flex-start;
         }
 
         .whiteboard-cell .slash-mark {
@@ -255,14 +307,15 @@ usort($user_schedules, function($a, $b) {
 
         @media (max-width: 768px) {
             .whiteboard-cell {
-                min-height: 80px;
+                min-height: 90px;
                 padding: 3px;
             }
             .whiteboard-date-num {
                 font-size: 1rem;
             }
-            .marker-text-red, .marker-text-blue {
-                font-size: 0.78rem;
+            .marker-badge-red, .marker-badge-blue {
+                font-size: 0.75rem;
+                padding: 2px 4px;
             }
             .whiteboard-day-header {
                 font-size: 0.75rem;
@@ -309,7 +362,7 @@ usort($user_schedules, function($a, $b) {
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
         <div>
             <h4 class="fw-bold mb-1 text-dark"><i class="bi bi-calendar3 text-primary me-2"></i>Iskedyul at Kalendaryo (Schedule & Calendar)</h4>
-            <p class="text-muted small mb-0">Tingnan ang opisyal na whiteboard schedule mula sa Admin pati na rin ang iyong nakaiskedyul na mga pickup at hiram na gamit.</p>
+            <p class="text-muted small mb-0">Tingnan ang opisyal na whiteboard schedule mula sa Admin pati na rin ang iyong nakaiskedyul na mga pickup at hiram na gamit. I-click ang petsa para sa buong breakdown.</p>
         </div>
         <div class="d-flex align-items-center gap-2">
             <a href="?month=<?= $prev_month ?>&year=<?= $prev_year ?>" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
@@ -355,39 +408,37 @@ usort($user_schedules, function($a, $b) {
 
                 // Days of current month
                 for ($day = 1; $day <= $days_in_month; $day++) {
-                    $has_admin_content = isset($admin_schedules[$day]) && count($admin_schedules[$day]) > 0;
-                    $has_user_content = isset($user_month_schedules[$day]) && count($user_month_schedules[$day]) > 0;
+                    $day_events = $day_events_map[$day] ?? [];
+                    $total_events = count($day_events);
+                    $date_formatted = sprintf('%04d-%02d-%02d', $year, $month, $day);
                     ?>
-                    <div class="whiteboard-cell">
+                    <div class="whiteboard-cell" onclick="openDayBreakdown('<?= $date_formatted ?>', <?= htmlspecialchars(json_encode($day_events), ENT_QUOTES) ?>)">
                         <div class="whiteboard-date-num"><?= $day ?></div>
 
-                        <!-- Admin Whiteboard Entries -->
-                        <?php if ($has_admin_content): ?>
-                            <?php foreach ($admin_schedules[$day] as $as): ?>
-                                <div class="marker-text-red fw-bold mb-1">
-                                    <?= htmlspecialchars($as['department'] ? $as['department'] . ' ' : '') ?>
-                                    <?= htmlspecialchars($as['title']) ?>
-                                    <?php if (!empty($as['scheduled_time'])): ?>
-                                        <div style="font-size: 0.85rem;" class="fw-normal"><?= htmlspecialchars($as['scheduled_time']) ?></div>
-                                    <?php endif; ?>
-                                </div>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
-
-                        <!-- User Personal Order Schedules -->
-                        <?php if ($has_user_content): ?>
-                            <?php foreach ($user_month_schedules[$day] as $us): ?>
-                                <div class="marker-text-blue fw-bold bg-white p-1 rounded border border-primary-subtle shadow-sm mb-1" title="<?= htmlspecialchars($us['requisitioner'] ?? '') ?>">
-                                    <i class="bi bi-clock me-1"></i><?= htmlspecialchars($us['type']) ?>
-                                    <div style="font-size: 0.78rem;" class="text-dark fw-normal"><?= htmlspecialchars($us['time']) ?> <?= !empty($us['requisitioner']) ? ' - ' . htmlspecialchars($us['requisitioner']) : '' ?></div>
-                                </div>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
-
-                        <!-- Red slashes on empty weekend days like in photo -->
                         <?php
+                        $display_limit = 2;
+                        $count = 0;
+                        foreach ($day_events as $ev) {
+                            if ($count >= $display_limit) break;
+                            if ($ev['is_admin']) {
+                                echo '<div class="marker-badge-red" title="' . htmlspecialchars($ev['title']) . '">';
+                                echo '<i class="bi bi-pin-fill me-1"></i>' . htmlspecialchars($ev['title']);
+                                echo '</div>';
+                            } else {
+                                echo '<div class="marker-badge-blue" title="' . htmlspecialchars($ev['title']) . '">';
+                                echo '<i class="bi bi-clock me-1"></i>' . htmlspecialchars($ev['category']) . ': ' . htmlspecialchars($ev['time']);
+                                echo '</div>';
+                            }
+                            $count++;
+                        }
+
+                        if ($total_events > $display_limit) {
+                            $more_count = $total_events - $display_limit;
+                            echo '<span class="more-schedules-badge">+ ' . $more_count . ' higit pa</span>';
+                        }
+
                         $current_col = ($first_day_of_week + $day - 2) % 7 + 1; // 1=Mon, 7=Sun
-                        if (!$has_admin_content && !$has_user_content && ($current_col == 7)) {
+                        if ($total_events == 0 && ($current_col == 7)) {
                             echo '<div class="slash-mark">///</div>';
                         }
                         ?>
@@ -409,7 +460,7 @@ usort($user_schedules, function($a, $b) {
     <!-- All Scheduled Events Table Breakdown -->
     <div class="card border-0 shadow-sm rounded-4 overflow-hidden mb-4">
         <div class="card-header bg-light p-3 border-bottom d-flex justify-content-between align-items-center">
-            <h6 class="fw-bold mb-0 text-dark d-flex align-items-center"><i class="bi bi-clock-history me-2 text-primary"></i>Detailed List of All Scheduled Pickups & Deadlines</h6>
+            <h6 class="fw-bold mb-0 text-dark d-flex align-items-center"><i class="bi bi-clock-history me-2 text-primary"></i>Buong Listahan ng Lahat ng Nakaiskedyul na Pickup, Event & Deadlines</h6>
             <span class="badge bg-secondary"><?= count($user_schedules) ?> Total Items</span>
         </div>
         <div class="card-body p-0">
@@ -460,6 +511,64 @@ usort($user_schedules, function($a, $b) {
     </div>
 </div>
 
+<!-- Modal: Daily Schedule Breakdown -->
+<div class="modal fade" id="dayBreakdownModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <div class="modal-header text-white" style="background-color: #1b4f9c;">
+                <h5 class="modal-title fw-bold" id="modalDateTitle"><i class="bi bi-calendar-event me-2"></i>Daily Schedule Breakdown</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4" id="modalEventsContent">
+                <!-- Populated via JavaScript -->
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary rounded-pill btn-sm px-4 fw-bold" data-bs-dismiss="modal">Isara</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+function openDayBreakdown(dateStr, events) {
+    document.getElementById('modalDateTitle').innerHTML = '<i class="bi bi-calendar-event me-2"></i>Schedule Breakdown para sa ' + dateStr;
+    var container = document.getElementById('modalEventsContent');
+
+    if (!events || events.length === 0) {
+        container.innerHTML = `
+            <div class="text-center text-muted py-4">
+                <i class="bi bi-calendar-x fs-1 text-secondary d-block mb-2"></i>
+                <p class="mb-0 fw-semibold">Walang nakaiskedyul na admin posting o order sa petsang ito.</p>
+            </div>
+        `;
+    } else {
+        var html = '<div class="list-group list-group-flush border-0">';
+        events.forEach(function(ev) {
+            var iconClass = ev.is_admin ? 'bi-pin-angle-fill text-danger' : 'bi-clock-history text-primary';
+            var bgBadge = ev.is_admin ? 'bg-danger' : 'bg-primary';
+
+            html += `
+                <div class="list-group-item p-3 mb-2 rounded-3 border bg-light shadow-sm">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="badge ${bgBadge} rounded-pill px-3 py-1 fw-bold">
+                            <i class="bi ${iconClass} text-white me-1"></i>${ev.category}
+                        </span>
+                        <span class="badge bg-white text-dark border px-3 py-1 fw-bold"><i class="bi bi-clock me-1 text-primary"></i>${ev.time}</span>
+                    </div>
+                    <h6 class="fw-bold text-dark mb-1">${ev.title}</h6>
+                    <p class="small text-secondary mb-1"><strong>Requisitioner / Dept:</strong> ${ev.requisitioner}</p>
+                    ${ev.details ? `<p class="small text-muted mb-0"><strong>Details:</strong> ${ev.details}</p>` : ''}
+                </div>
+            `;
+        });
+        html += '</div>';
+        container.innerHTML = html;
+    }
+
+    var modal = new bootstrap.Modal(document.getElementById('dayBreakdownModal'));
+    modal.show();
+}
+</script>
 </body>
 </html>

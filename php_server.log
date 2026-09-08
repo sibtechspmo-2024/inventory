@@ -589,3 +589,63 @@ Stack trace:
 [Tue Sep  8 03:21:10 2026] [::1]:59886 Accepted
 [Tue Sep  8 03:21:10 2026] [::1]:59886 [200]: GET /sw.js
 [Tue Sep  8 03:21:10 2026] [::1]:59886 Closing
+[Tue Sep  8 05:01:02 2026] [::1]:55760 Accepted
+[Tue Sep  8 05:01:02 2026] [::1]:55760 [200]: GET /index.php
+[Tue Sep  8 05:01:02 2026] [::1]:55760 Closing
+[Tue Sep  8 05:01:02 2026] [::1]:55768 Accepted
+[Tue Sep  8 05:01:02 2026] [::1]:55778 Accepted
+[Tue Sep  8 05:01:02 2026] [::1]:55768 [404]: GET /css/index.css - No such file or directory
+[Tue Sep  8 05:01:02 2026] [::1]:55768 Closing
+[Tue Sep  8 05:01:02 2026] [::1]:55778 [200]: GET /logo.jpg
+[Tue Sep  8 05:01:02 2026] [::1]:55778 Closing
+[Tue Sep  8 05:01:04 2026] [::1]:55780 Accepted
+[Tue Sep  8 05:01:04 2026] [::1]:55780 [302]: POST /index.php
+[Tue Sep  8 05:01:04 2026] [::1]:55780 Closing
+[Tue Sep  8 05:01:04 2026] [::1]:55782 Accepted
+[Tue Sep  8 05:01:04 2026] [::1]:55782 [200]: GET /admin_dashboard.php
+[Tue Sep  8 05:01:04 2026] [::1]:55782 Closing
+[Tue Sep  8 05:01:04 2026] [::1]:55790 Accepted
+[Tue Sep  8 05:01:04 2026] [::1]:55802 Accepted
+[Tue Sep  8 05:01:04 2026] [::1]:55790 [404]: GET /css/admin_dashboard.css - No such file or directory
+[Tue Sep  8 05:01:04 2026] [::1]:55790 Closing
+[Tue Sep  8 05:01:04 2026] [::1]:55802 [200]: GET /logo.jpg
+[Tue Sep  8 05:01:04 2026] [::1]:55802 Closing
+[Tue Sep  8 05:01:04 2026] [::1]:55808 Accepted
+[Tue Sep  8 05:01:04 2026] [::1]:55808 [200]: GET /sw.js
+[Tue Sep  8 05:01:04 2026] [::1]:55808 Closing
+[Tue Sep  8 05:01:04 2026] [::1]:55810 Accepted
+[Tue Sep  8 05:01:04 2026] [::1]:55816 Accepted
+[Tue Sep  8 05:01:04 2026] [::1]:55828 Accepted
+[Tue Sep  8 05:01:04 2026] [::1]:55810 [200]: GET /
+[Tue Sep  8 05:01:04 2026] [::1]:55810 Closing
+[Tue Sep  8 05:01:04 2026] [::1]:55816 [200]: GET /index.php
+[Tue Sep  8 05:01:04 2026] [::1]:55816 Closing
+[Tue Sep  8 05:01:04 2026] [::1]:55828 [200]: GET /manifest.json
+[Tue Sep  8 05:01:04 2026] [::1]:55828 Closing
+[Tue Sep  8 05:01:04 2026] [::1]:55844 Accepted
+[Tue Sep  8 05:01:04 2026] [::1]:55854 Accepted
+[Tue Sep  8 05:01:04 2026] [::1]:55856 Accepted
+[Tue Sep  8 05:01:04 2026] [::1]:55844 [200]: GET /logo.jpg
+[Tue Sep  8 05:01:04 2026] [::1]:55844 Closing
+[Tue Sep  8 05:01:04 2026] [::1]:55854 [404]: GET /css/user_dashboard.css - No such file or directory
+[Tue Sep  8 05:01:04 2026] [::1]:55854 Closing
+[Tue Sep  8 05:01:04 2026] [::1]:55856 [404]: GET /css/index.css - No such file or directory
+[Tue Sep  8 05:01:04 2026] [::1]:55856 Closing
+[Tue Sep  8 05:01:04 2026] [::1]:55864 Accepted
+[Tue Sep  8 05:01:04 2026] [::1]:55866 Accepted
+[Tue Sep  8 05:01:04 2026] [::1]:55870 Accepted
+[Tue Sep  8 05:01:04 2026] [::1]:55872 Accepted
+[Tue Sep  8 05:01:04 2026] [::1]:55882 Accepted
+[Tue Sep  8 05:01:04 2026] [::1]:55894 Accepted
+[Tue Sep  8 05:01:05 2026] [::1]:55864 [200]: GET /user_schedule.php
+[Tue Sep  8 05:01:05 2026] [::1]:55864 Closing
+[Tue Sep  8 05:01:05 2026] [::1]:55866 [404]: GET /css/request_history.css - No such file or directory
+[Tue Sep  8 05:01:05 2026] [::1]:55866 Closing
+[Tue Sep  8 05:01:05 2026] [::1]:55870 [200]: GET /logo.jpg
+[Tue Sep  8 05:01:05 2026] [::1]:55870 Closing
+[Tue Sep  8 05:01:07 2026] [::1]:55872 [200]: GET /sw.js
+[Tue Sep  8 05:01:07 2026] [::1]:55872 Closing
+[Tue Sep  8 05:01:09 2026] [::1]:55882 Closed without sending a request; it was probably just an unused speculative preconnection
+[Tue Sep  8 05:01:09 2026] [::1]:55882 Closing
+[Tue Sep  8 05:01:09 2026] [::1]:55894 Closed without sending a request; it was probably just an unused speculative preconnection
+[Tue Sep  8 05:01:09 2026] [::1]:55894 Closing

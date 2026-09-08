@@ -163,3 +163,69 @@ Stack trace:
 [Tue Sep  8 02:18:58 2026] [::1]:43702 [200]: GET /logo.jpg
 [Tue Sep  8 02:18:58 2026] [::1]:43700 Closing
 [Tue Sep  8 02:18:58 2026] [::1]:43702 Closing
+[Tue Sep  8 02:37:40 2026] [::1]:56928 Accepted
+[Tue Sep  8 02:37:40 2026] [::1]:56928 [200]: GET /index.php
+[Tue Sep  8 02:37:40 2026] [::1]:56928 Closing
+[Tue Sep  8 02:37:40 2026] [::1]:56944 Accepted
+[Tue Sep  8 02:37:40 2026] [::1]:56948 Accepted
+[Tue Sep  8 02:37:40 2026] [::1]:56944 [404]: GET /css/index.css - No such file or directory
+[Tue Sep  8 02:37:40 2026] [::1]:56948 [200]: GET /logo.jpg
+[Tue Sep  8 02:37:40 2026] [::1]:56944 Closing
+[Tue Sep  8 02:37:40 2026] [::1]:56948 Closing
+[Tue Sep  8 02:37:41 2026] [::1]:56958 Accepted
+[Tue Sep  8 02:37:41 2026] [::1]:56958 [302]: POST /index.php
+[Tue Sep  8 02:37:41 2026] [::1]:56958 Closing
+[Tue Sep  8 02:37:41 2026] [::1]:56972 Accepted
+[Tue Sep  8 02:37:41 2026] [::1]:56972 [200]: GET /user_dashboard.php
+[Tue Sep  8 02:37:41 2026] [::1]:56972 Closing
+[Tue Sep  8 02:37:41 2026] [::1]:56988 Accepted
+[Tue Sep  8 02:37:41 2026] [::1]:57000 Accepted
+[Tue Sep  8 02:37:41 2026] [::1]:56988 [404]: GET /css/user_dashboard.css - No such file or directory
+[Tue Sep  8 02:37:41 2026] [::1]:57000 [200]: GET /logo.jpg
+[Tue Sep  8 02:37:41 2026] [::1]:56988 Closing
+[Tue Sep  8 02:37:41 2026] [::1]:57000 Closing
+[Tue Sep  8 02:37:41 2026] [::1]:57012 Accepted
+[Tue Sep  8 02:37:41 2026] [::1]:57012 [200]: GET /user_dashboard.php?action=get_notifications
+[Tue Sep  8 02:37:41 2026] [::1]:57012 Closing
+[Tue Sep  8 02:37:41 2026] [::1]:57024 Accepted
+[Tue Sep  8 02:37:41 2026] [::1]:57024 [200]: GET /sw.js
+[Tue Sep  8 02:37:41 2026] [::1]:57024 Closing
+[Tue Sep  8 02:37:41 2026] [::1]:57038 Accepted
+[Tue Sep  8 02:37:41 2026] [::1]:57042 Accepted
+[Tue Sep  8 02:37:41 2026] [::1]:57046 Accepted
+[Tue Sep  8 02:37:41 2026] [::1]:57038 [200]: GET /
+[Tue Sep  8 02:37:41 2026] [::1]:57038 Closing
+[Tue Sep  8 02:37:41 2026] [::1]:57042 [200]: GET /index.php
+[Tue Sep  8 02:37:41 2026] [::1]:57042 Closing
+[Tue Sep  8 02:37:41 2026] [::1]:57046 [200]: GET /manifest.json
+[Tue Sep  8 02:37:41 2026] [::1]:57046 Closing
+[Tue Sep  8 02:37:41 2026] [::1]:57062 Accepted
+[Tue Sep  8 02:37:41 2026] [::1]:57070 Accepted
+[Tue Sep  8 02:37:41 2026] [::1]:57072 Accepted
+[Tue Sep  8 02:37:41 2026] [::1]:57062 [200]: GET /logo.jpg
+[Tue Sep  8 02:37:41 2026] [::1]:57070 [404]: GET /css/index.css - No such file or directory
+[Tue Sep  8 02:37:41 2026] [::1]:57070 Closing
+[Tue Sep  8 02:37:41 2026] [::1]:57072 [404]: GET /css/user_dashboard.css - No such file or directory
+[Tue Sep  8 02:37:41 2026] [::1]:57072 Closing
+[Tue Sep  8 02:37:41 2026] [::1]:57062 Closing
+[Tue Sep  8 02:37:41 2026] [::1]:57082 Accepted
+[Tue Sep  8 02:37:41 2026] [::1]:57082 [404]: GET /css/admin_dashboard.css - No such file or directory
+[Tue Sep  8 02:37:41 2026] [::1]:57082 Closing
+[Tue Sep  8 02:37:41 2026] [::1]:57092 Accepted
+[Tue Sep  8 02:37:41 2026] [::1]:57096 Accepted
+[Tue Sep  8 02:37:41 2026] [::1]:57108 Accepted
+[Tue Sep  8 02:37:41 2026] [::1]:57124 Accepted
+[Tue Sep  8 02:37:41 2026] [::1]:57138 Accepted
+[Tue Sep  8 02:37:41 2026] [::1]:57146 Accepted
+[Tue Sep  8 02:37:42 2026] [::1]:57092 [200]: GET /print_borrow_request.php?group_id=BRW-TEST1234
+[Tue Sep  8 02:37:42 2026] [::1]:57092 Closing
+[Tue Sep  8 02:37:42 2026] [::1]:57096 [200]: GET /logo.jpg
+[Tue Sep  8 02:37:42 2026] [::1]:57096 Closing
+[Tue Sep  8 02:37:43 2026] [::1]:57108 [200]: GET /sw.js
+[Tue Sep  8 02:37:43 2026] [::1]:57108 Closing
+[Tue Sep  8 02:37:44 2026] [::1]:57124 Closed without sending a request; it was probably just an unused speculative preconnection
+[Tue Sep  8 02:37:44 2026] [::1]:57124 Closing
+[Tue Sep  8 02:37:44 2026] [::1]:57138 Closed without sending a request; it was probably just an unused speculative preconnection
+[Tue Sep  8 02:37:44 2026] [::1]:57138 Closing
+[Tue Sep  8 02:37:44 2026] [::1]:57146 Closed without sending a request; it was probably just an unused speculative preconnection
+[Tue Sep  8 02:37:44 2026] [::1]:57146 Closing

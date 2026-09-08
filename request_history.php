@@ -285,7 +285,9 @@ $maint_requests = $conn->query("
                                         </td>
                                         <td class="text-nowrap text-muted small"><?= date('Y-m-d H:i', strtotime($req['created_at'])) ?></td>
                                         <td class="text-end">
-                                            <?php if($req['status'] == 'Rejected'): ?>
+                                            <?php if($req['status'] == 'Approved' || $req['status'] == 'Returned'): ?>
+                                                <a href="print_borrow_request.php?group_id=<?= $req['request_group_id'] ?>" class="btn btn-sm btn-logo-primary rounded-pill px-3"><i class="bi bi-printer me-1"></i>Print Form</a>
+                                            <?php elseif($req['status'] == 'Rejected'): ?>
                                                 <button class="btn btn-sm btn-outline-danger rounded-pill px-3 delete-btn" onclick="deleteRequest('<?= $req['request_group_id'] ?>', 'borrow')"><i class="bi bi-trash me-1"></i>Delete</button>
                                             <?php else: ?>
                                                 <button class="btn btn-sm btn-outline-secondary rounded-pill px-3" disabled><i class="bi bi-clock me-1"></i><?= $req['status'] ?></button>
@@ -443,8 +445,45 @@ function fetchLatestData() {
             renderTable('office-tbody', data.office, 'office', 'print_request.php');
             renderTable('maint-tbody', data.maintenance, 'maintenance', 'print_maintenance_request.php');
             renderPrintTable('print-tbody', data.printing);
+            renderBorrowTable('borrow-tbody', data.borrow);
         }
     });
+}
+
+function renderBorrowTable(tbodyId, items) {
+    const tbody = document.getElementById(tbodyId);
+    if (!items || items.length === 0) {
+        tbody.innerHTML = `<tr class="no-data"><td colspan="8" class="text-center text-muted py-4">Walang borrow requests.</td></tr>`;
+        return;
+    }
+    let html = '';
+    items.forEach(req => {
+        let badgeClass = (req.status === 'Approved' || req.status === 'Returned') ? 'order-badge-approved' : (req.status === 'Rejected' ? 'order-badge-rejected' : 'order-badge-pending');
+        let actionBtn = '';
+        if (req.status === 'Approved' || req.status === 'Returned') {
+            actionBtn = `<a href="print_borrow_request.php?group_id=${req.request_group_id}" class="btn btn-sm btn-logo-primary rounded-pill px-3"><i class="bi bi-printer me-1"></i>Print Form</a>`;
+        } else if (req.status === 'Rejected') {
+            actionBtn = `<button class="btn btn-sm btn-outline-danger rounded-pill px-3 delete-btn" onclick="deleteRequest('${req.request_group_id}', 'borrow')"><i class="bi bi-trash me-1"></i>Delete</button>`;
+        } else {
+            actionBtn = `<button class="btn btn-sm btn-outline-secondary rounded-pill px-3" disabled><i class="bi bi-clock me-1"></i>${req.status}</button>`;
+        }
+
+        html += `<tr id="row-${req.request_group_id}">
+            <td class="fw-bold text-nowrap text-logo-blue">#${req.request_group_id}</td>
+            <td class="fw-semibold text-dark">${req.item_name}</td>
+            <td><span class="badge bg-secondary rounded-pill">${req.quantity}</span></td>
+            <td class="small">
+                <span class="text-primary fw-bold"><i class="bi bi-calendar-event me-1"></i>Start: ${req.borrow_date}</span><br>
+                <span class="text-danger fw-bold"><i class="bi bi-calendar-check me-1"></i>Return: ${req.expected_return_date}</span><br>
+                <span class="text-muted"><i class="bi bi-clock me-1"></i>${req.scheduled_time || ''}</span>
+            </td>
+            <td><strong>${req.requisitioner_name || ''}</strong><br><span class="badge bg-light text-dark border">${req.department}</span></td>
+            <td><span class="badge rounded-pill px-3 py-2 ${badgeClass}">${req.status}</span></td>
+            <td class="text-nowrap text-muted small">${req.created_at}</td>
+            <td class="text-end">${actionBtn}</td>
+        </tr>`;
+    });
+    tbody.innerHTML = html;
 }
 
 function renderPrintTable(tbodyId, items) {

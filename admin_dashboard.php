@@ -655,6 +655,9 @@ $is_req_hist = isset($_GET['req_status']) || isset($_GET['req_cat']);
                                         </td>
                                         <td class="text-end">
                                             <div class="btn-group">
+                                                <?php if ($b['status'] === 'Approved' || $b['status'] === 'Returned'): ?>
+                                                    <a href="print_borrow_request.php?group_id=<?= $b['request_group_id'] ?>" target="_blank" class="btn btn-sm btn-outline-dark rounded-pill px-2 me-1" title="Print Borrower Form"><i class="fa-solid fa-print"></i> Print</a>
+                                                <?php endif; ?>
                                                 <form method="POST" action="" class="ajax-form d-inline">
                                                     <input type="hidden" name="action_borrow_request" value="1">
                                                     <input type="hidden" name="request_id" value="<?= $b['id'] ?>">

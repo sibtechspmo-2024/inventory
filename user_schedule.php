@@ -55,71 +55,7 @@ if ($cal_stmt) {
 // Fetch user's own requests/orders schedules for list view and calendar display
 $user_schedules = [];
 
-// 1. Office supply schedules (all users)
-$off_res = $conn->query("
-    SELECT r.request_group_id, r.requisitioner_name, r.department, r.date_needed, r.scheduled_time, r.purpose, r.status, r.quantity,
-           IFNULL(i.item_name, 'Item') as item_name
-    FROM supply_requests r
-    LEFT JOIN items i ON r.item_id = i.id
-    WHERE r.date_needed IS NOT NULL
-");
-if ($off_res) {
-    $grouped_off = [];
-    while ($r = $off_res->fetch_assoc()) {
-        $gid = $r['request_group_id'];
-        if (!isset($grouped_off[$gid])) {
-            $grouped_off[$gid] = [
-                'date' => $r['date_needed'],
-                'time' => $r['scheduled_time'] ?? '09:00 AM - 10:00 AM',
-                'type' => 'Office Supply Pickup',
-                'badge' => 'bg-primary',
-                'id' => $gid,
-                'requisitioner' => $r['requisitioner_name'] . ' (' . $r['department'] . ')',
-                'items' => [],
-                'status' => $r['status']
-            ];
-        }
-        $grouped_off[$gid]['items'][] = $r['item_name'] . ' (x' . $r['quantity'] . ')';
-    }
-    foreach ($grouped_off as $g) {
-        $g['items'] = implode(', ', $g['items']);
-        $user_schedules[] = $g;
-    }
-}
-
-// 2. Maintenance supply schedules (all users)
-$mnt_res = $conn->query("
-    SELECT r.request_group_id, r.requisitioner_name, r.department, r.date_needed, r.scheduled_time, r.purpose, r.status, r.quantity,
-           IFNULL(m.item_name, 'Item') as item_name
-    FROM maintenance_requests r
-    LEFT JOIN maintenance_items m ON r.item_id = m.id
-    WHERE r.date_needed IS NOT NULL
-");
-if ($mnt_res) {
-    $grouped_mnt = [];
-    while ($r = $mnt_res->fetch_assoc()) {
-        $gid = $r['request_group_id'];
-        if (!isset($grouped_mnt[$gid])) {
-            $grouped_mnt[$gid] = [
-                'date' => $r['date_needed'],
-                'time' => $r['scheduled_time'] ?? '09:00 AM - 10:00 AM',
-                'type' => 'Maintenance Pickup',
-                'badge' => 'bg-warning text-dark',
-                'id' => $gid,
-                'requisitioner' => $r['requisitioner_name'] . ' (' . $r['department'] . ')',
-                'items' => [],
-                'status' => $r['status']
-            ];
-        }
-        $grouped_mnt[$gid]['items'][] = $r['item_name'] . ' (x' . $r['quantity'] . ')';
-    }
-    foreach ($grouped_mnt as $g) {
-        $g['items'] = implode(', ', $g['items']);
-        $user_schedules[] = $g;
-    }
-}
-
-// 3. Document printing schedules (all users)
+// 1. Document printing schedules (all users)
 $prt_res = $conn->query("
     SELECT request_group_id, requisitioner_name, department, date_needed, scheduled_time, paper_size, print_color, total_price, status
     FROM document_printing_requests

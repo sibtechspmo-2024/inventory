@@ -91,3 +91,75 @@ Stack trace:
 [Tue Sep  8 00:47:22 2026] [::1]:53214 Closing
 [Tue Sep  8 00:47:22 2026] [::1]:53220 [200]: GET /logo.jpg
 [Tue Sep  8 00:47:22 2026] [::1]:53220 Closing
+[Tue Sep  8 01:56:33 2026] [::1]:44096 Accepted
+[Tue Sep  8 01:56:33 2026] [::1]:44096 [200]: GET /index.php
+[Tue Sep  8 01:56:33 2026] [::1]:44096 Closing
+[Tue Sep  8 01:56:33 2026] [::1]:44102 Accepted
+[Tue Sep  8 01:56:33 2026] [::1]:44108 Accepted
+[Tue Sep  8 01:56:33 2026] [::1]:44102 [404]: GET /css/index.css - No such file or directory
+[Tue Sep  8 01:56:33 2026] [::1]:44102 Closing
+[Tue Sep  8 01:56:33 2026] [::1]:44108 [200]: GET /logo.jpg
+[Tue Sep  8 01:56:33 2026] [::1]:44108 Closing
+[Tue Sep  8 01:56:33 2026] [::1]:44124 Accepted
+[Tue Sep  8 01:56:33 2026] [::1]:44124 [302]: POST /index.php
+[Tue Sep  8 01:56:33 2026] [::1]:44124 Closing
+[Tue Sep  8 01:56:33 2026] [::1]:44132 Accepted
+[Tue Sep  8 01:56:33 2026] [::1]:44132 [200]: GET /admin_dashboard.php
+[Tue Sep  8 01:56:33 2026] [::1]:44132 Closing
+[Tue Sep  8 01:56:33 2026] [::1]:44136 Accepted
+[Tue Sep  8 01:56:33 2026] [::1]:44146 Accepted
+[Tue Sep  8 01:56:33 2026] [::1]:44136 [404]: GET /css/admin_dashboard.css - No such file or directory
+[Tue Sep  8 01:56:33 2026] [::1]:44136 Closing
+[Tue Sep  8 01:56:33 2026] [::1]:44146 [200]: GET /logo.jpg
+[Tue Sep  8 01:56:33 2026] [::1]:44146 Closing
+[Tue Sep  8 01:56:33 2026] [::1]:44154 Accepted
+[Tue Sep  8 01:56:33 2026] [::1]:44154 [200]: GET /sw.js
+[Tue Sep  8 01:56:33 2026] [::1]:44154 Closing
+[Tue Sep  8 01:56:34 2026] [::1]:44168 Accepted
+[Tue Sep  8 01:56:34 2026] [::1]:44182 Accepted
+[Tue Sep  8 01:56:34 2026] [::1]:44196 Accepted
+[Tue Sep  8 01:56:34 2026] [::1]:44168 [200]: GET /
+[Tue Sep  8 01:56:34 2026] [::1]:44168 Closing
+[Tue Sep  8 01:56:34 2026] [::1]:44182 [200]: GET /index.php
+[Tue Sep  8 01:56:34 2026] [::1]:44182 Closing
+[Tue Sep  8 01:56:34 2026] [::1]:44196 [200]: GET /manifest.json
+[Tue Sep  8 01:56:34 2026] [::1]:44196 Closing
+[Tue Sep  8 01:56:34 2026] [::1]:44200 Accepted
+[Tue Sep  8 01:56:34 2026] [::1]:44204 Accepted
+[Tue Sep  8 01:56:34 2026] [::1]:44208 Accepted
+[Tue Sep  8 01:56:34 2026] [::1]:44200 [200]: GET /logo.jpg
+[Tue Sep  8 01:56:34 2026] [::1]:44204 [404]: GET /css/index.css - No such file or directory
+[Tue Sep  8 01:56:34 2026] [::1]:44204 Closing
+[Tue Sep  8 01:56:34 2026] [::1]:44208 [404]: GET /css/user_dashboard.css - No such file or directory
+[Tue Sep  8 01:56:34 2026] [::1]:44200 Closing
+[Tue Sep  8 01:56:34 2026] [::1]:44208 Closing
+[Tue Sep  8 01:56:34 2026] [::1]:44222 Accepted
+[Tue Sep  8 01:56:34 2026] [::1]:44228 Accepted
+[Tue Sep  8 01:56:34 2026] [::1]:44238 Accepted
+[Tue Sep  8 01:56:34 2026] [::1]:44250 Accepted
+[Tue Sep  8 01:56:34 2026] [::1]:44262 Accepted
+[Tue Sep  8 01:56:34 2026] [::1]:44266 Accepted
+[Tue Sep  8 01:56:34 2026] [::1]:44222 [302]: GET /user_schedule.php
+[Tue Sep  8 01:56:34 2026] [::1]:44222 Closing
+[Tue Sep  8 01:56:34 2026] [::1]:44228 [200]: GET /index.php
+[Tue Sep  8 01:56:34 2026] [::1]:44228 Closing
+[Tue Sep  8 01:56:34 2026] [::1]:44238 [404]: GET /css/index.css - No such file or directory
+[Tue Sep  8 01:56:34 2026] [::1]:44238 Closing
+[Tue Sep  8 01:56:34 2026] [::1]:44250 [200]: GET /logo.jpg
+[Tue Sep  8 01:56:34 2026] [::1]:44250 Closing
+[Tue Sep  8 01:56:36 2026] [::1]:44262 [200]: GET /sw.js
+[Tue Sep  8 01:56:36 2026] [::1]:44262 Closing
+[Tue Sep  8 01:56:36 2026] [::1]:44266 Closed without sending a request; it was probably just an unused speculative preconnection
+[Tue Sep  8 01:56:36 2026] [::1]:44266 Closing
+[Tue Sep  8 02:18:57 2026] [::1]:43676 Accepted
+[Tue Sep  8 02:18:57 2026] [::1]:43676 [302]: GET /user_schedule.php
+[Tue Sep  8 02:18:57 2026] [::1]:43676 Closing
+[Tue Sep  8 02:18:57 2026] [::1]:43684 Accepted
+[Tue Sep  8 02:18:57 2026] [::1]:43684 [200]: GET /index.php
+[Tue Sep  8 02:18:57 2026] [::1]:43684 Closing
+[Tue Sep  8 02:18:57 2026] [::1]:43700 Accepted
+[Tue Sep  8 02:18:57 2026] [::1]:43702 Accepted
+[Tue Sep  8 02:18:57 2026] [::1]:43700 [404]: GET /css/index.css - No such file or directory
+[Tue Sep  8 02:18:58 2026] [::1]:43702 [200]: GET /logo.jpg
+[Tue Sep  8 02:18:58 2026] [::1]:43700 Closing
+[Tue Sep  8 02:18:58 2026] [::1]:43702 Closing

@@ -152,6 +152,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_borrow_request
     }
 }
 
+// ACTION HANDLER PARA SA CALENDAR SCHEDULE MANAGEMENT
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_add_schedule'])) {
+    $title = trim($_POST['title'] ?? '');
+    $department = trim($_POST['department'] ?? '');
+    $event_date = trim($_POST['event_date'] ?? '');
+    $scheduled_time = trim($_POST['scheduled_time'] ?? '');
+    $details = trim($_POST['details'] ?? '');
+
+    if (!empty($title) && !empty($event_date)) {
+        $stmt_cal = $conn->prepare("INSERT INTO calendar_schedules (title, department, event_date, scheduled_time, details, created_by) VALUES (?, ?, ?, ?, ?, 'Admin')");
+        $stmt_cal->bind_param("sssss", $title, $department, $event_date, $scheduled_time, $details);
+        if ($stmt_cal->execute()) {
+            sendResponse("Matagumpay na naidagdag ang bagong schedule sa kalendaryo!", true);
+        } else {
+            sendResponse("Nabigong idagdag ang schedule.", false);
+        }
+    } else {
+        sendResponse("Paki-punan ang Pamagat (Title) at Petsa (Date).", false);
+    }
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_delete_schedule'])) {
+    $sched_id = intval($_POST['schedule_id'] ?? 0);
+    if ($sched_id > 0) {
+        $stmt_del = $conn->prepare("DELETE FROM calendar_schedules WHERE id = ?");
+        $stmt_del->bind_param("i", $sched_id);
+        if ($stmt_del->execute()) {
+            sendResponse("Matagumpay na nabura ang schedule!", true);
+        } else {
+            sendResponse("Nabigong burahin ang schedule.", false);
+        }
+    } else {
+        sendResponse("Invalid schedule ID.", false);
+    }
+}
+
 // ACTION HANDLER PARA SA DOCUMENT PRINTING REQUESTS
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_print_request'])) {
     $req_id = intval($_POST['request_id'] ?? 0);
@@ -305,13 +341,24 @@ $borrow_requests = $conn->query("
     ORDER BY r.id DESC
 ");
 
-$borrow_pending_count = $conn->query("SELECT COUNT(*) as cnt FROM borrow_requests WHERE status = 'Pending'")->fetch_assoc()['cnt'] ?? 0;
-$print_pending_count = $conn->query("SELECT COUNT(*) as cnt FROM document_printing_requests WHERE status = 'Pending'")->fetch_assoc()['cnt'] ?? 0;
+$res_b = $conn->query("SELECT COUNT(*) as cnt FROM borrow_requests WHERE status = 'Pending'");
+$row_b = $res_b ? $res_b->fetch_assoc() : null;
+$borrow_pending_count = $row_b['cnt'] ?? 0;
+
+$res_p = $conn->query("SELECT COUNT(*) as cnt FROM document_printing_requests WHERE status = 'Pending'");
+$row_p = $res_p ? $res_p->fetch_assoc() : null;
+$print_pending_count = $row_p['cnt'] ?? 0;
+
 $office_pending_count = $office_requests ? $office_requests->num_rows : 0;
 $maint_pending_count = $maint_requests ? $maint_requests->num_rows : 0;
 
-$office_out_of_stock = $conn->query("SELECT COUNT(*) as cnt FROM items WHERE actual_stocks <= 0")->fetch_assoc()['cnt'] ?? 0;
-$maint_out_of_stock = $conn->query("SELECT COUNT(*) as cnt FROM maintenance_items WHERE actual_stocks <= 0")->fetch_assoc()['cnt'] ?? 0;
+$res_o = $conn->query("SELECT COUNT(*) as cnt FROM items WHERE actual_stocks <= 0");
+$row_o = $res_o ? $res_o->fetch_assoc() : null;
+$office_out_of_stock = $row_o['cnt'] ?? 0;
+
+$res_m = $conn->query("SELECT COUNT(*) as cnt FROM maintenance_items WHERE actual_stocks <= 0");
+$row_m = $res_m ? $res_m->fetch_assoc() : null;
+$maint_out_of_stock = $row_m['cnt'] ?? 0;
 
 // Stock history query with filter options
 $stock_cat = $_GET['stock_cat'] ?? 'all';
@@ -626,11 +673,93 @@ $is_req_hist = isset($_GET['req_status']) || isset($_GET['req_cat']);
 
         <!-- Tab: Calendar & Scheduling -->
         <div class="tab-pane fade" id="calendar-view">
-            <div class="card p-4 border-0 shadow-sm rounded-4">
-                <h5 class="fw-bold text-dark mb-3"><i class="fa-solid fa-calendar-days text-logo-blue me-2"></i>System Scheduling & Calendar Overview</h5>
-                <div class="p-3 bg-light rounded-3 border mb-3">
-                    <p class="mb-0 text-muted small"><i class="fa-solid fa-circle-info text-primary me-2"></i>Ipinapakita rito ang lahat ng mga nakaiskedyul na pickup ng supply orders at deadline ng pagsasauli ng mga hiniram na gamit.</p>
+            <div class="card p-4 border-0 shadow-sm rounded-4 mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold text-dark mb-0"><i class="fa-solid fa-calendar-plus text-logo-blue me-2"></i>Magdagdag ng Bagong Whiteboard Schedule (Admin Posting)</h5>
+                    <a href="user_schedule.php" target="_blank" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold">
+                        <i class="fa-solid fa-eye me-1"></i> View Whiteboard Schedule
+                    </a>
                 </div>
+                <form method="POST" action="" class="ajax-form bg-light p-3 rounded-3 border">
+                    <input type="hidden" name="action_add_schedule" value="1">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold text-secondary">Department / Subject Code</label>
+                            <input type="text" name="department" class="form-control form-control-sm" placeholder="e.g., CRIM, HM, CBA, SAD, Dean">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold text-secondary">Title / Activity *</label>
+                            <input type="text" name="title" class="form-control form-control-sm" placeholder="e.g., 7:00-12:00, Class Schedule" required>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small fw-bold text-secondary">Event Date *</label>
+                            <input type="date" name="event_date" class="form-control form-control-sm" required value="<?= date('Y-m-d') ?>">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small fw-bold text-secondary">Time Slot</label>
+                            <input type="text" name="scheduled_time" class="form-control form-control-sm" placeholder="e.g., 7:00 AM - 12:00 PM">
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <button type="submit" class="btn btn-sm btn-logo-primary rounded-pill w-100 fw-bold">
+                                <i class="fa-solid fa-plus me-1"></i> Add Schedule
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Admin Posted Schedules Table -->
+            <div class="card p-4 border-0 shadow-sm rounded-4 mb-4">
+                <h5 class="fw-bold text-dark mb-3"><i class="fa-solid fa-calendar-check text-logo-blue me-2"></i>Listahan ng Admin Whiteboard Postings</h5>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle border">
+                        <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Department</th>
+                                <th>Title / Activity</th>
+                                <th>Date</th>
+                                <th>Time Slot</th>
+                                <th>Posted By</th>
+                                <th class="text-end">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php
+                            $posted_cal = $conn->query("SELECT * FROM calendar_schedules ORDER BY event_date DESC, id DESC");
+                            if ($posted_cal && $posted_cal->num_rows > 0):
+                                while ($pcal = $posted_cal->fetch_assoc()):
+                            ?>
+                                <tr>
+                                    <td class="fw-bold text-secondary">#<?= $pcal['id'] ?></td>
+                                    <td><span class="badge bg-danger text-white fw-bold"><?= htmlspecialchars($pcal['department'] ?: 'GENERAL') ?></span></td>
+                                    <td class="fw-bold text-dark"><?= htmlspecialchars($pcal['title']) ?></td>
+                                    <td class="fw-bold text-primary"><i class="fa-solid fa-calendar me-1"></i><?= htmlspecialchars($pcal['event_date']) ?></td>
+                                    <td><span class="badge bg-light text-dark border"><?= htmlspecialchars($pcal['scheduled_time'] ?: 'N/A') ?></span></td>
+                                    <td class="small text-muted"><?= htmlspecialchars($pcal['created_by']) ?></td>
+                                    <td class="text-end">
+                                        <form method="POST" action="" class="ajax-form d-inline">
+                                            <input type="hidden" name="action_delete_schedule" value="1">
+                                            <input type="hidden" name="schedule_id" value="<?= $pcal['id'] ?>">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3 fw-bold" onclick="return confirm('Sigurado ka bang burahin ang schedule na ito?');">
+                                                <i class="fa-solid fa-trash me-1"></i> Delete
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            <?php
+                                endwhile;
+                            else:
+                            ?>
+                                <tr><td colspan="7" class="text-center text-muted py-4">Walang nai-post na admin schedules.</td></tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card p-4 border-0 shadow-sm rounded-4">
+                <h5 class="fw-bold text-dark mb-3"><i class="fa-solid fa-calendar-days text-logo-blue me-2"></i>System Pickup & Borrow Schedules</h5>
                 <div class="table-responsive">
                     <table class="table table-bordered align-middle">
                         <thead class="table-light">

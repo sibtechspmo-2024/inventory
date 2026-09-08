@@ -2,7 +2,7 @@
 session_start();
 require_once 'db.php';
 
-if (!isset($_SESSION['user_id']) || strtolower($_SESSION['role'] ?? '') !== 'user') {
+if (!isset($_SESSION['user_id'])) {
     if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
         echo json_encode(['status' => 'error', 'message' => 'Unauthorized']);
         exit;
@@ -274,23 +274,29 @@ usort($user_schedules, function($a, $b) {
 
 <nav class="navbar navbar-expand-lg navbar-dark navbar-history sticky-top shadow-sm" style="background-color: #1b4f9c;">
     <div class="container-fluid px-4">
-        <a class="navbar-brand fw-bold text-white d-flex align-items-center" href="user_dashboard.php">
+        <a class="navbar-brand fw-bold text-white d-flex align-items-center" href="<?= (strtolower($_SESSION['role'] ?? '') === 'admin') ? 'admin_dashboard.php' : 'user_dashboard.php' ?>">
             <img src="logo.jpg" alt="SIBTECH Logo" class="navbar-brand-logo rounded-circle border border-2 border-white me-2" style="width: 38px;">
             <div class="lh-1">
                 <span class="fs-5 d-block">SIBTECH SCHEDULE & CALENDAR</span>
-                <small class="fw-light text-white-50" style="font-size: 0.72rem;">User Timeline & System Schedule</small>
+                <small class="fw-light text-white-50" style="font-size: 0.72rem;">Timeline & System Schedule</small>
             </div>
         </a>
         <div class="d-flex align-items-center">
-            <a href="user_dashboard.php" class="btn btn-outline-light btn-sm rounded-pill px-3 me-2">
-                <i class="bi bi-grid-fill me-1"></i> Supply Store
-            </a>
-            <a href="borrow_items.php" class="btn btn-outline-light btn-sm rounded-pill px-3 me-2">
-                <i class="bi bi-hand-holding-box me-1"></i> Borrow Items
-            </a>
-            <a href="request_history.php" class="btn btn-outline-light btn-sm rounded-pill px-3 me-2">
-                <i class="bi bi-bag-check-fill me-1"></i> My Requests
-            </a>
+            <?php if (strtolower($_SESSION['role'] ?? '') === 'admin'): ?>
+                <a href="admin_dashboard.php" class="btn btn-outline-light btn-sm rounded-pill px-3 me-2">
+                    <i class="bi bi-speedometer2 me-1"></i> Admin Dashboard
+                </a>
+            <?php else: ?>
+                <a href="user_dashboard.php" class="btn btn-outline-light btn-sm rounded-pill px-3 me-2">
+                    <i class="bi bi-grid-fill me-1"></i> Supply Store
+                </a>
+                <a href="borrow_items.php" class="btn btn-outline-light btn-sm rounded-pill px-3 me-2">
+                    <i class="bi bi-hand-holding-box me-1"></i> Borrow Items
+                </a>
+                <a href="request_history.php" class="btn btn-outline-light btn-sm rounded-pill px-3 me-2">
+                    <i class="bi bi-bag-check-fill me-1"></i> My Requests
+                </a>
+            <?php endif; ?>
             <a href="logout.php" class="btn btn-outline-light btn-sm rounded-pill px-3">
                 <i class="bi bi-box-arrow-right me-1"></i> Logout
             </a>

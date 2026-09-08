@@ -162,11 +162,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_add_schedule']
 
     if (!empty($title) && !empty($event_date)) {
         $stmt_cal = $conn->prepare("INSERT INTO calendar_schedules (title, department, event_date, scheduled_time, details, created_by) VALUES (?, ?, ?, ?, ?, 'Admin')");
-        $stmt_cal->bind_param("sssss", $title, $department, $event_date, $scheduled_time, $details);
-        if ($stmt_cal->execute()) {
-            sendResponse("Matagumpay na naidagdag ang bagong schedule sa kalendaryo!", true);
+        if ($stmt_cal) {
+            $stmt_cal->bind_param("sssss", $title, $department, $event_date, $scheduled_time, $details);
+            if ($stmt_cal->execute()) {
+                sendResponse("Matagumpay na naidagdag ang bagong schedule sa kalendaryo!", true);
+            } else {
+                sendResponse("Nabigong idagdag ang schedule.", false);
+            }
         } else {
-            sendResponse("Nabigong idagdag ang schedule.", false);
+            sendResponse("Database error habang inihahanda ang query.", false);
         }
     } else {
         sendResponse("Paki-punan ang Pamagat (Title) at Petsa (Date).", false);
@@ -177,11 +181,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_delete_schedul
     $sched_id = intval($_POST['schedule_id'] ?? 0);
     if ($sched_id > 0) {
         $stmt_del = $conn->prepare("DELETE FROM calendar_schedules WHERE id = ?");
-        $stmt_del->bind_param("i", $sched_id);
-        if ($stmt_del->execute()) {
-            sendResponse("Matagumpay na nabura ang schedule!", true);
+        if ($stmt_del) {
+            $stmt_del->bind_param("i", $sched_id);
+            if ($stmt_del->execute()) {
+                sendResponse("Matagumpay na nabura ang schedule!", true);
+            } else {
+                sendResponse("Nabigong burahin ang schedule.", false);
+            }
         } else {
-            sendResponse("Nabigong burahin ang schedule.", false);
+            sendResponse("Database error habang inihahanda ang deletion.", false);
         }
     } else {
         sendResponse("Invalid schedule ID.", false);

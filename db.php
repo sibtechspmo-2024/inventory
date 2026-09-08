@@ -311,7 +311,7 @@ if (!$conn->connect_error) {
     // Tiyaking umiiral ang calendar_schedules table para sa admin schedule management
     $conn->query("
         CREATE TABLE IF NOT EXISTS calendar_schedules (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id INT AUTO_INCREMENT PRIMARY KEY,
             title TEXT NOT NULL,
             department TEXT NULL,
             event_date DATE NOT NULL,

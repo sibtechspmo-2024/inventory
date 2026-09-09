@@ -14,7 +14,7 @@ if (empty($group_id)) {
 
 // Fetch Maintenance Request Info
 $stmt_info = $conn->prepare("
-    SELECT r.request_group_id, r.requisitioner_name, u.fullname, r.department, r.purpose, r.date_needed, r.status, r.request_date, r.approved_at
+    SELECT r.request_group_id, r.requisitioner_name, u.fullname, r.department, r.purpose, r.room_reserved, r.date_needed, r.status, r.request_date, r.approved_at
     FROM maintenance_requests r
     JOIN users u ON r.user_id = u.id
     WHERE r.request_group_id = ?
@@ -103,6 +103,10 @@ if ($blank_rows < 0) $blank_rows = 0;
             <td><?= htmlspecialchars($data['department']) ?></td>
             <td style="font-weight: bold;">Date Needed</td>
             <td><?= $data['date_needed'] ? date('Y-m-d', strtotime($data['date_needed'])) : '' ?></td>
+        </tr>
+        <tr>
+            <td style="font-weight: bold;">Room Reserved:</td>
+            <td colspan="3"><?= htmlspecialchars($data['room_reserved'] ?: 'N/A') ?></td>
         </tr>
         <tr>
             <td colspan="4" class="text-center fw-bold" style="background-color: #f2f2f2;">Purpose</td>

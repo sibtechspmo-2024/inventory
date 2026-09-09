@@ -36,24 +36,24 @@ if (isset($_GET['action']) && $_GET['action'] === 'fetch_updates') {
     header('Content-Type: application/json');
 
     $office_requests_res = $conn->query("
-        SELECT r.request_group_id, u.fullname AS requisitioner_name, r.department, r.purpose, r.date_needed, r.status, r.request_date,
+        SELECT r.request_group_id, u.fullname AS requisitioner_name, r.department, r.purpose, r.room_reserved, r.date_needed, r.status, r.request_date,
                GROUP_CONCAT(CONCAT(IFNULL(i.item_name, 'Unknown Item'), ' (x', r.quantity, ')') SEPARATOR '<br>') AS items_summary
         FROM supply_requests r
         JOIN users u ON r.user_id = u.id
         LEFT JOIN items i ON r.item_id = i.id
         WHERE r.user_id = {$user_id}
-        GROUP BY r.request_group_id, u.fullname, r.department, r.purpose, r.date_needed, r.status, r.request_date
+        GROUP BY r.request_group_id, u.fullname, r.department, r.purpose, r.room_reserved, r.date_needed, r.status, r.request_date
         ORDER BY r.request_date DESC
     ")->fetch_all(MYSQLI_ASSOC);
 
     $maint_requests_res = $conn->query("
-        SELECT r.request_group_id, u.fullname AS requisitioner_name, r.department, r.purpose, r.date_needed, r.status, r.request_date,
+        SELECT r.request_group_id, u.fullname AS requisitioner_name, r.department, r.purpose, r.room_reserved, r.date_needed, r.status, r.request_date,
                GROUP_CONCAT(CONCAT(IFNULL(m.item_name, 'Unknown Item'), ' (x', r.quantity, ')') SEPARATOR '<br>') AS items_summary
         FROM maintenance_requests r
         JOIN users u ON r.user_id = u.id
         LEFT JOIN maintenance_items m ON r.item_id = m.id
         WHERE r.user_id = {$user_id}
-        GROUP BY r.request_group_id, u.fullname, r.department, r.purpose, r.date_needed, r.status, r.request_date
+        GROUP BY r.request_group_id, u.fullname, r.department, r.purpose, r.room_reserved, r.date_needed, r.status, r.request_date
         ORDER BY r.request_date DESC
     ")->fetch_all(MYSQLI_ASSOC);
 
@@ -67,26 +67,45 @@ if (isset($_GET['action']) && $_GET['action'] === 'fetch_updates') {
 
 // Initial Fetch
 $office_requests = $conn->query("
-    SELECT r.request_group_id, u.fullname AS requisitioner_name, r.department, r.purpose, r.date_needed, r.status, r.request_date,
+    SELECT r.request_group_id, u.fullname AS requisitioner_name, r.department, r.purpose, r.room_reserved, r.date_needed, r.status, r.request_date,
            GROUP_CONCAT(CONCAT(IFNULL(i.item_name, 'Unknown Item'), ' (x', r.quantity, ')') SEPARATOR '<br>') AS items_summary
     FROM supply_requests r
     JOIN users u ON r.user_id = u.id
     LEFT JOIN items i ON r.item_id = i.id
     WHERE r.user_id = {$user_id}
-    GROUP BY r.request_group_id, u.fullname, r.department, r.purpose, r.date_needed, r.status, r.request_date
+    GROUP BY r.request_group_id, u.fullname, r.department, r.purpose, r.room_reserved, r.date_needed, r.status, r.request_date
     ORDER BY r.request_date DESC
 ");
 
 $maint_requests = $conn->query("
-    SELECT r.request_group_id, u.fullname AS requisitioner_name, r.department, r.purpose, r.date_needed, r.status, r.request_date,
+    SELECT r.request_group_id, u.fullname AS requisitioner_name, r.department, r.purpose, r.room_reserved, r.date_needed, r.status, r.request_date,
            GROUP_CONCAT(CONCAT(IFNULL(m.item_name, 'Unknown Item'), ' (x', r.quantity, ')') SEPARATOR '<br>') AS items_summary
     FROM maintenance_requests r
     JOIN users u ON r.user_id = u.id
     LEFT JOIN maintenance_items m ON r.item_id = m.id
     WHERE r.user_id = {$user_id}
-    GROUP BY r.request_group_id, u.fullname, r.department, r.purpose, r.date_needed, r.status, r.request_date
+    GROUP BY r.request_group_id, u.fullname, r.department, r.purpose, r.room_reserved, r.date_needed, r.status, r.request_date
     ORDER BY r.request_date DESC
 ");
+
+// Fetch calendar schedule for the user
+$user_schedules = [];
+$sched_sql = "
+    SELECT 'office' as type, request_group_id, requisitioner_name, department, purpose, room_reserved, date_needed, status
+    FROM supply_requests
+    WHERE user_id = {$user_id} AND date_needed IS NOT NULL AND date_needed != ''
+    GROUP BY request_group_id, requisitioner_name, department, purpose, room_reserved, date_needed, status
+    UNION ALL
+    SELECT 'maintenance' as type, request_group_id, requisitioner_name, department, purpose, room_reserved, date_needed, status
+    FROM maintenance_requests
+    WHERE user_id = {$user_id} AND date_needed IS NOT NULL AND date_needed != ''
+    GROUP BY request_group_id, requisitioner_name, department, purpose, room_reserved, date_needed, status
+    ORDER BY date_needed ASC
+";
+$sched_res = $conn->query($sched_sql);
+if ($sched_res) {
+    while ($r = $sched_res->fetch_assoc()) $user_schedules[] = $r;
+}
 ?>
 
 <!DOCTYPE html>
@@ -132,7 +151,7 @@ $maint_requests = $conn->query("
     <div class="orders-header d-flex flex-wrap align-items-center justify-content-between gap-3">
         <div>
             <h4 class="fw-bold mb-1"><i class="bi bi-bag-check-fill text-logo-blue me-2"></i>Aking mga Inorder (My Orders)</h4>
-            <p class="text-muted small mb-0">Subaybayan ang status ng inyong mga isinumiteng order para sa Office at Maintenance supplies.</p>
+            <p class="text-muted small mb-0">Subaybayan ang status ng inyong mga isinumiteng order at room reservations.</p>
         </div>
         <ul class="nav nav-pills" id="requestTabs" role="tablist">
             <li class="nav-item">
@@ -143,6 +162,11 @@ $maint_requests = $conn->query("
             <li class="nav-item">
                 <button class="nav-link fw-bold" id="maint-tab" data-bs-toggle="tab" data-bs-target="#maint-requests" type="button">
                     <i class="bi bi-tools me-1"></i> Maintenance Supply Orders
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link fw-bold" id="calendar-tab" data-bs-toggle="tab" data-bs-target="#calendar-schedule" type="button">
+                    <i class="bi bi-calendar-event me-1"></i> Calendar Room Schedule
                 </button>
             </li>
         </ul>
@@ -157,12 +181,12 @@ $maint_requests = $conn->query("
                         <thead class="table-light">
                             <tr>
                                 <th>Order ID</th><th>Ordered Items</th><th>Requisitioner</th><th>Department</th>
-                                <th>Purpose</th><th>Date Needed</th><th>Status</th><th>Date Requested</th><th class="text-end">Action</th>
+                                <th>Room Reserved</th><th>Purpose</th><th>Date Needed</th><th>Status</th><th>Date Requested</th><th class="text-end">Action</th>
                             </tr>
                         </thead>
                         <tbody id="office-tbody">
                             <?php if(!$office_requests || $office_requests->num_rows == 0): ?>
-                                <tr class="no-data"><td colspan="9" class="text-center text-muted py-4">Walang office supply orders.</td></tr>
+                                <tr class="no-data"><td colspan="10" class="text-center text-muted py-4">Walang office supply orders.</td></tr>
                             <?php else: ?>
                                 <?php while($req = $office_requests->fetch_assoc()): ?>
                                     <tr id="row-<?= $req['request_group_id'] ?>">
@@ -170,6 +194,7 @@ $maint_requests = $conn->query("
                                         <td><?= $req['items_summary'] ?></td>
                                         <td><?= htmlspecialchars($req['requisitioner_name'] ?? '') ?></td>
                                         <td><span class="badge bg-light text-dark border"><?= htmlspecialchars($req['department']) ?></span></td>
+                                        <td><span class="badge bg-info text-dark fw-bold"><i class="bi bi-door-open me-1"></i><?= htmlspecialchars($req['room_reserved'] ?: 'N/A') ?></span></td>
                                         <td><?= htmlspecialchars($req['purpose']) ?></td>
                                         <td class="text-nowrap"><?= $req['date_needed'] ? date('Y-m-d', strtotime($req['date_needed'])) : '-' ?></td>
                                         <td>
@@ -206,12 +231,12 @@ $maint_requests = $conn->query("
                         <thead class="table-light">
                             <tr>
                                 <th>Order ID</th><th>Ordered Items</th><th>Requisitioner</th><th>Department</th>
-                                <th>Purpose</th><th>Date Needed</th><th>Status</th><th>Date Requested</th><th class="text-end">Action</th>
+                                <th>Room Reserved</th><th>Purpose</th><th>Date Needed</th><th>Status</th><th>Date Requested</th><th class="text-end">Action</th>
                             </tr>
                         </thead>
                         <tbody id="maint-tbody">
                             <?php if(!$maint_requests || $maint_requests->num_rows == 0): ?>
-                                <tr class="no-data"><td colspan="9" class="text-center text-muted py-4">Walang maintenance supply orders.</td></tr>
+                                <tr class="no-data"><td colspan="10" class="text-center text-muted py-4">Walang maintenance supply orders.</td></tr>
                             <?php else: ?>
                                 <?php while($req = $maint_requests->fetch_assoc()): ?>
                                     <tr id="row-<?= $req['request_group_id'] ?>">
@@ -219,6 +244,7 @@ $maint_requests = $conn->query("
                                         <td><?= $req['items_summary'] ?></td>
                                         <td><?= htmlspecialchars($req['requisitioner_name'] ?? '') ?></td>
                                         <td><span class="badge bg-light text-dark border"><?= htmlspecialchars($req['department']) ?></span></td>
+                                        <td><span class="badge bg-info text-dark fw-bold"><i class="bi bi-door-open me-1"></i><?= htmlspecialchars($req['room_reserved'] ?: 'N/A') ?></span></td>
                                         <td><?= htmlspecialchars($req['purpose']) ?></td>
                                         <td class="text-nowrap"><?= $req['date_needed'] ? date('Y-m-d', strtotime($req['date_needed'])) : '-' ?></td>
                                         <td>
@@ -240,6 +266,58 @@ $maint_requests = $conn->query("
                                         </td>
                                     </tr>
                                 <?php endwhile; ?>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Calendar Room Schedule Tab -->
+        <div class="tab-pane fade" id="calendar-schedule">
+            <div class="card card-history p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold text-dark mb-0"><i class="bi bi-calendar-range text-primary me-2"></i>Calendar Scheduling (Aking Room Reservations)</h5>
+                    <span class="badge bg-primary px-3 py-2"><i class="bi bi-door-open me-1"></i>Room Reservation Schedule</span>
+                </div>
+                <div class="alert alert-light border py-2 mb-3 small">
+                    <i class="bi bi-info-circle-fill text-primary me-1"></i> Ang talahanayan na ito ay nagpapakita ng nakatakdang <strong>Room Reserved</strong> sa bawat petsa. Ang mga nahiram na gamit ay tinanggal na sa schedule view.
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Date Needed</th>
+                                <th>Room Reserved</th>
+                                <th>Requisitioner</th>
+                                <th>Department</th>
+                                <th>Purpose</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (!empty($user_schedules)): ?>
+                                <?php foreach ($user_schedules as $sched): ?>
+                                    <?php
+                                    $st = $sched['status'];
+                                    $stClass = ($st == 'Approved') ? 'order-badge-approved' : (($st == 'Rejected') ? 'order-badge-rejected' : 'order-badge-pending');
+                                    ?>
+                                    <tr>
+                                        <td class="fw-bold text-dark"><i class="bi bi-calendar-check text-primary me-2"></i><?= date('F d, Y', strtotime($sched['date_needed'])) ?></td>
+                                        <td><span class="badge bg-primary text-white fs-6 px-3 py-2"><i class="bi bi-door-open me-1"></i><?= htmlspecialchars($sched['room_reserved'] ?: 'Unspecified Room') ?></span></td>
+                                        <td><?= htmlspecialchars($sched['requisitioner_name'] ?? '') ?></td>
+                                        <td><span class="badge bg-light text-dark border"><?= htmlspecialchars($sched['department']) ?></span></td>
+                                        <td><?= htmlspecialchars($sched['purpose']) ?></td>
+                                        <td><span class="badge rounded-pill px-3 py-2 <?= $stClass ?>"><?= $st ?></span></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted py-4">
+                                        <i class="bi bi-calendar-x fs-2 d-block text-secondary mb-2"></i>
+                                        Walang nakaschedule na room reservation.
+                                    </td>
+                                </tr>
                             <?php endif; ?>
                         </tbody>
                     </table>
@@ -282,7 +360,7 @@ function fetchLatestData() {
 function renderTable(tbodyId, items, type, printPage) {
     const tbody = document.getElementById(tbodyId);
     if (!items || items.length === 0) {
-        tbody.innerHTML = `<tr class="no-data"><td colspan="9" class="text-center text-muted py-4">Walang ${type} supply orders.</td></tr>`;
+        tbody.innerHTML = `<tr class="no-data"><td colspan="10" class="text-center text-muted py-4">Walang ${type} supply orders.</td></tr>`;
         return;
     }
     let html = '';
@@ -297,11 +375,14 @@ function renderTable(tbodyId, items, type, printPage) {
             actionBtn = `<button class="btn btn-sm btn-outline-secondary rounded-pill px-3" disabled><i class="bi bi-clock me-1"></i>Pending</button>`;
         }
 
+        let roomDisp = req.room_reserved ? req.room_reserved : 'N/A';
+
         html += `<tr id="row-${req.request_group_id}">
             <td class="fw-bold text-nowrap text-logo-blue">#${req.request_group_id}</td>
             <td>${req.items_summary}</td>
             <td>${req.requisitioner_name || ''}</td>
             <td><span class="badge bg-light text-dark border">${req.department}</span></td>
+            <td><span class="badge bg-info text-dark fw-bold"><i class="bi bi-door-open me-1"></i>${roomDisp}</span></td>
             <td>${req.purpose}</td>
             <td class="text-nowrap">${req.date_needed ? req.date_needed.split(' ')[0] : '-'}</td>
             <td><span class="badge rounded-pill px-3 py-2 ${badgeClass}">${req.status}</span></td>

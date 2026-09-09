@@ -65,3 +65,66 @@
 [Wed Sep  9 01:52:12 2026] 127.0.0.1:47802 [200]: GET /icons/icon-512.png
 [Wed Sep  9 01:52:12 2026] 127.0.0.1:47792 Closing
 [Wed Sep  9 01:52:12 2026] 127.0.0.1:47802 Closing
+[Wed Sep  9 02:23:39 2026] 127.0.0.1:52366 Accepted
+[Wed Sep  9 02:23:40 2026] 127.0.0.1:52366 [200]: GET /index.php
+[Wed Sep  9 02:23:40 2026] 127.0.0.1:52366 Closing
+[Wed Sep  9 02:23:40 2026] 127.0.0.1:52378 Accepted
+[Wed Sep  9 02:23:40 2026] 127.0.0.1:52378 [200]: GET /css/index.css
+[Wed Sep  9 02:23:40 2026] 127.0.0.1:52378 Closing
+[Wed Sep  9 02:23:40 2026] 127.0.0.1:52380 Accepted
+[Wed Sep  9 02:23:40 2026] 127.0.0.1:52380 [200]: GET /logo.jpg
+[Wed Sep  9 02:23:40 2026] 127.0.0.1:52380 Closing
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52396 Accepted
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52396 [302]: POST /index.php
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52396 Closing
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52402 Accepted
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52402 [200]: GET /admin_dashboard.php
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52402 Closing
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52408 Accepted
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52412 Accepted
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52408 [200]: GET /css/admin_dashboard.css
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52412 [200]: GET /logo.jpg
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52408 Closing
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52412 Closing
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52424 Accepted
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52424 [200]: GET /sw.js
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52424 Closing
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52430 Accepted
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52438 Accepted
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52452 Accepted
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52430 [200]: GET /
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52430 Closing
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52438 [200]: GET /index.php
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52438 Closing
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52452 [200]: GET /manifest.json
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52452 Closing
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52464 Accepted
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52480 Accepted
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52464 [200]: GET /logo.jpg
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52480 [200]: GET /css/index.css
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52464 Closing
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52480 Closing
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52486 Accepted
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52486 [200]: GET /css/user_dashboard.css
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52486 Closing
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52498 Accepted
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52504 Accepted
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52514 Accepted
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52498 [200]: GET /css/admin_office.css
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52504 [200]: GET /css/admin_dashboard.css
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52498 Closing
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52504 Closing
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52514 [200]: GET /css/admin_maintenance.css
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52514 Closing
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52526 Accepted
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52526 [200]: GET /css/in_stock.css
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52526 Closing
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52542 Accepted
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52558 Accepted
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52574 Accepted
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52542 [200]: GET /css/request_history.css
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52542 Closing
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52558 [200]: GET /icons/icon-192.png
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52558 Closing
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52574 [200]: GET /icons/icon-512.png
+[Wed Sep  9 02:23:41 2026] 127.0.0.1:52574 Closing

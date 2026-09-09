@@ -286,24 +286,29 @@ usort($all_history_requests, function($a, $b) {
     return strtotime($b['created_at']) - strtotime($a['created_at']);
 });
 
-// Query for Calendar Scheduling (Room Reservations)
-$calendar_schedules = [];
-$cs_sql = "
-    SELECT 'office' as type, request_group_id, requisitioner_name, department, purpose, room_reserved, date_needed, status, MAX(request_date) as created_at
-    FROM supply_requests
-    WHERE date_needed IS NOT NULL AND date_needed != ''
-    GROUP BY request_group_id, requisitioner_name, department, purpose, room_reserved, date_needed, status
+// Query for Schedule Board (Calendar Room Schedule & Details Modal)
+$schedule_board_events = [];
+$sb_sql = "
+    SELECT r.request_group_id, r.user_id, r.requisitioner_name, r.department, r.purpose, r.room_reserved, r.date_needed, r.status, 'office' as category,
+           GROUP_CONCAT(CONCAT(IFNULL(i.item_name, 'Item'), ' (x', r.quantity, ')') SEPARATOR '<br>') as equipment_list
+    FROM supply_requests r
+    LEFT JOIN items i ON r.item_id = i.id
+    WHERE r.date_needed IS NOT NULL AND r.date_needed != ''
+    GROUP BY r.request_group_id, r.user_id, r.requisitioner_name, r.department, r.purpose, r.room_reserved, r.date_needed, r.status
     UNION ALL
-    SELECT 'maintenance' as type, request_group_id, requisitioner_name, department, purpose, room_reserved, date_needed, status, MAX(request_date) as created_at
-    FROM maintenance_requests
-    WHERE date_needed IS NOT NULL AND date_needed != ''
-    GROUP BY request_group_id, requisitioner_name, department, purpose, room_reserved, date_needed, status
+    SELECT r.request_group_id, r.user_id, r.requisitioner_name, r.department, r.purpose, r.room_reserved, r.date_needed, r.status, 'maintenance' as category,
+           GROUP_CONCAT(CONCAT(IFNULL(m.item_name, 'Item'), ' (x', r.quantity, ')') SEPARATOR '<br>') as equipment_list
+    FROM maintenance_requests r
+    LEFT JOIN maintenance_items m ON r.item_id = m.id
+    WHERE r.date_needed IS NOT NULL AND r.date_needed != ''
+    GROUP BY r.request_group_id, r.user_id, r.requisitioner_name, r.department, r.purpose, r.room_reserved, r.date_needed, r.status
     ORDER BY date_needed ASC
 ";
-$cs_res = $conn->query($cs_sql);
-if ($cs_res) {
-    while ($r = $cs_res->fetch_assoc()) {
-        $calendar_schedules[] = $r;
+$sb_res = $conn->query($sb_sql);
+if ($sb_res) {
+    while ($r = $sb_res->fetch_assoc()) {
+        $date_key = date('Y-m-d', strtotime($r['date_needed']));
+        $schedule_board_events[$date_key][] = $r;
     }
 }
 ?>
@@ -322,6 +327,87 @@ if ($cs_res) {
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <style>
+        .schedule-board-box {
+            background: #eef2f5;
+            border: 3px solid #2d3748;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+        .schedule-board-title {
+            font-family: 'Comic Sans MS', 'Segoe UI', cursive, sans-serif;
+            color: #c53030;
+            font-weight: 900;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+        .schedule-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            border: 2px solid #2d3748;
+            background: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .schedule-header {
+            background: #e2e8f0;
+            font-weight: 800;
+            text-align: center;
+            padding: 10px 4px;
+            border-bottom: 2px solid #2d3748;
+            border-right: 1px solid #cbd5e0;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            font-style: italic;
+        }
+        .schedule-cell {
+            min-height: 110px;
+            border-right: 1px solid #cbd5e0;
+            border-bottom: 1px solid #cbd5e0;
+            padding: 6px;
+            position: relative;
+            background: #ffffff;
+        }
+        .schedule-cell.out-month {
+            background: #a0aec0;
+            opacity: 0.6;
+        }
+        .schedule-cell.sunday {
+            background: repeating-linear-gradient(45deg, #ffffff, #ffffff 10px, #fff5f5 10px, #fff5f5 15px);
+        }
+        .schedule-day-num {
+            font-weight: 900;
+            font-size: 1.15rem;
+            color: #c53030;
+            font-style: italic;
+            margin-bottom: 4px;
+        }
+        .event-pin {
+            display: block;
+            background: #fed7d7;
+            color: #9b2c2c;
+            border-radius: 12px;
+            padding: 3px 8px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+            cursor: pointer;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            border: 1px solid #feb2b2;
+            transition: transform 0.1s ease;
+        }
+        .event-pin:hover {
+            transform: scale(1.03);
+        }
+        .event-pin-blue {
+            background: #ebf8ff;
+            color: #2b6cb0;
+            border-color: #bee3f8;
+        }
+    </style>
 </head>
 <body>
 
@@ -432,8 +518,8 @@ $is_req_hist = isset($_GET['req_status']) || isset($_GET['req_cat']);
             </li>
             <li class="nav-item">
                 <button class="nav-link d-flex align-items-center justify-content-center gap-2" id="calendar-sched-tab" data-bs-toggle="tab" data-bs-target="#calendar-sched" type="button">
-                    <span><i class="fa-solid fa-calendar-days me-1"></i> Calendar Scheduling</span>
-                    <span class="badge rounded-pill bg-warning text-dark fw-bold"><?= count($calendar_schedules) ?></span>
+                    <span><i class="fa-solid fa-calendar-days me-1"></i> Schedule Board</span>
+                    <span class="badge rounded-pill bg-warning text-dark fw-bold"><?= count($schedule_board_events) ?></span>
                 </button>
             </li>
             <li class="nav-item">
@@ -639,67 +725,73 @@ $is_req_hist = isset($_GET['req_status']) || isset($_GET['req_cat']);
             </div>
         </div>
 
-        <!-- Tab 4: Calendar Scheduling (Room Reservations) -->
+        <!-- Tab 4: Schedule Board (Calendar Room Reservations) -->
         <div class="tab-pane fade" id="calendar-sched">
-            <div class="card p-4">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="fw-bold text-dark mb-0"><i class="fa-solid fa-calendar-days text-logo-blue me-2"></i>Calendar Scheduling (Room Reservations)</h5>
-                    <span class="badge bg-primary px-3 py-2 fw-bold"><i class="fa-solid fa-door-open me-1"></i>Room Reservations Schedule</span>
+            <div class="schedule-board-box mb-4">
+                <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-2">
+                    <h3 class="schedule-board-title mb-0"><i class="fa-solid fa-pencil text-danger me-2"></i>SCHEDULE BOARD - SEPTEMBER 2026</h3>
+                    <div class="d-flex gap-2 align-items-center">
+                        <span class="badge bg-danger text-white rounded-pill px-3 py-2 fw-bold"><i class="fa-solid fa-thumbtack me-1"></i> Admin Postings</span>
+                        <span class="badge bg-primary text-white rounded-pill px-3 py-2 fw-bold"><i class="fa-solid fa-calendar-check me-1"></i> Scheduled Orders</span>
+                    </div>
                 </div>
-                <div class="alert alert-info py-2 mb-3 small d-flex align-items-center gap-2">
-                    <i class="fa-solid fa-circle-info fs-5"></i>
-                    <span>Ang Calendar Schedule ay nagpapakita ng <strong>Room Reserved</strong> ng user sa bawat nakatakdang petsa. Ang mga nahiram na gamit ay tinanggal na dito.</span>
-                </div>
-                <div class="table-responsive table-container">
-                    <table class="table table-hover align-middle mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Date Needed</th>
-                                <th>Room Reserved</th>
-                                <th>Requisitioner</th>
-                                <th>Dept</th>
-                                <th>Purpose</th>
-                                <th>Category</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php if (!empty($calendar_schedules)): ?>
-                                <?php foreach ($calendar_schedules as $sched): ?>
-                                    <?php
-                                    $st = $sched['status'];
-                                    if ($st === 'Approved') {
-                                        $s_badge = '<span class="badge bg-success"><i class="fa-solid fa-check me-1"></i>Approved</span>';
-                                    } elseif ($st === 'Rejected') {
-                                        $s_badge = '<span class="badge bg-danger"><i class="fa-solid fa-xmark me-1"></i>Rejected</span>';
-                                    } else {
-                                        $s_badge = '<span class="badge bg-warning text-dark"><i class="fa-solid fa-clock me-1"></i>Pending</span>';
-                                    }
 
-                                    $cat_badge = ($sched['type'] === 'maintenance')
-                                        ? '<span class="badge bg-warning text-dark"><i class="fa-solid fa-wrench me-1"></i>Maintenance</span>'
-                                        : '<span class="badge bg-primary text-white"><i class="fa-solid fa-box-open me-1"></i>Office</span>';
-                                    ?>
-                                    <tr>
-                                        <td class="fw-bold text-dark"><i class="fa-regular fa-calendar-check text-primary me-2"></i><?= date('F d, Y', strtotime($sched['date_needed'])) ?></td>
-                                        <td><span class="badge bg-primary text-white fs-6 px-3 py-2"><i class="fa-solid fa-door-open me-1"></i><?= htmlspecialchars($sched['room_reserved'] ?: 'Unspecified Room') ?></span></td>
-                                        <td class="fw-semibold text-dark"><?= htmlspecialchars($sched['requisitioner_name']) ?></td>
-                                        <td><span class="badge bg-light text-dark border"><?= htmlspecialchars($sched['department']) ?></span></td>
-                                        <td><?= htmlspecialchars($sched['purpose']) ?></td>
-                                        <td><?= $cat_badge ?></td>
-                                        <td><?= $s_badge ?></td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            <?php else: ?>
-                                <tr>
-                                    <td colspan="7" class="text-center text-muted py-4">
-                                        <i class="fa-solid fa-calendar-xmark fs-2 d-block text-secondary mb-2"></i>
-                                        Walang nakaschedule na room reservation sa kasalukuyan.
-                                    </td>
-                                </tr>
+                <div class="schedule-grid">
+                    <div class="schedule-header">MONDAY</div>
+                    <div class="schedule-header">TUESDAY</div>
+                    <div class="schedule-header">WEDNESDAY</div>
+                    <div class="schedule-header">THURSDAY</div>
+                    <div class="schedule-header">FRIDAY</div>
+                    <div class="schedule-header">SATURDAY</div>
+                    <div class="schedule-header">SUNDAY</div>
+
+                    <!-- Week 1: Aug 31 (Mon) to Sept 6 (Sun) -->
+                    <div class="schedule-cell out-month"></div>
+                    <?php
+                    // Sept 1 to Sept 30 2026
+                    $year = 2026;
+                    $month = 9;
+                    $days_in_month = 30;
+
+                    for ($d = 1; $d <= $days_in_month; $d++) {
+                        $date_str = sprintf('%04d-%02d-%02d', $year, $month, $d);
+                        $day_of_week = date('N', strtotime($date_str)); // 1=Mon, 7=Sun
+                        $is_sunday = ($day_of_week == 7);
+                        $events = $schedule_board_events[$date_str] ?? [];
+                        ?>
+                        <div class="schedule-cell <?= $is_sunday ? 'sunday' : '' ?>">
+                            <div class="schedule-day-num"><?= $d ?></div>
+                            <?php if ($is_sunday): ?>
+                                <div class="text-danger opacity-50 fw-extrabold text-end small">///</div>
                             <?php endif; ?>
-                        </tbody>
-                    </table>
+
+                            <?php
+                            $shown = 0;
+                            foreach ($events as $ev):
+                                $shown++;
+                                if ($shown > 2) break;
+                                $pin_class = ($ev['category'] === 'maintenance') ? 'event-pin-blue' : 'event-pin';
+                                $room_label = htmlspecialchars($ev['room_reserved'] ?: 'Unspecified Room');
+                                $purpose_label = htmlspecialchars($ev['purpose'] ?: 'Reservation');
+                                $title_pin = "📌 " . $purpose_label . " (" . $room_label . ")";
+                                ?>
+                                <div class="event-pin <?= $pin_class ?>"
+                                     onclick="showBoardEventDetails('<?= htmlspecialchars($ev['request_group_id'], ENT_QUOTES) ?>', '<?= htmlspecialchars(addslashes($ev['requisitioner_name']), ENT_QUOTES) ?>', '<?= htmlspecialchars(addslashes($ev['department']), ENT_QUOTES) ?>', '<?= htmlspecialchars(addslashes($ev['purpose']), ENT_QUOTES) ?>', '<?= htmlspecialchars(addslashes($ev['room_reserved']), ENT_QUOTES) ?>', '<?= htmlspecialchars($ev['date_needed'], ENT_QUOTES) ?>', '<?= htmlspecialchars($ev['status'], ENT_QUOTES) ?>', '<?= htmlspecialchars(addslashes($ev['equipment_list']), ENT_QUOTES) ?>')">
+                                    <i class="fa-solid fa-thumbtack me-1"></i><?= $display_text ?>
+                                </div>
+                            <?php endforeach; ?>
+
+                            <?php if (count($events) > 2): ?>
+                                <span class="badge bg-light text-primary border" style="font-size: 0.65rem;">+ <?= count($events) - 2 ?> higit pa</span>
+                            <?php endif; ?>
+                        </div>
+                    <?php } ?>
+
+                    <!-- Gray out trailing month cells (Oct 1..4) -->
+                    <div class="schedule-cell out-month"></div>
+                    <div class="schedule-cell out-month"></div>
+                    <div class="schedule-cell out-month"></div>
+                    <div class="schedule-cell out-month"></div>
                 </div>
             </div>
         </div>
@@ -789,6 +881,59 @@ $is_req_hist = isset($_GET['req_status']) || isset($_GET['req_cat']);
     </div>
 </div>
 
+<!-- Modal para sa Schedule Event Details -->
+<div class="modal fade" id="scheduleEventModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-logo-blue text-white">
+        <h5 class="modal-title fs-6 fw-bold"><i class="fa-solid fa-calendar-check me-2"></i>Reservation & Borrow Details</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-4">
+        <div class="mb-3">
+            <span class="text-muted small d-block">Order / Group ID:</span>
+            <strong id="modal_evt_group_id" class="text-logo-blue fs-6"></strong>
+        </div>
+        <div class="row g-2 mb-3">
+            <div class="col-6">
+                <span class="text-muted small d-block">Requisitioner:</span>
+                <strong id="modal_evt_req_name" class="text-dark"></strong>
+            </div>
+            <div class="col-6">
+                <span class="text-muted small d-block">Department:</span>
+                <span id="modal_evt_dept" class="badge bg-light text-dark border"></span>
+            </div>
+        </div>
+        <div class="mb-3">
+            <span class="text-muted small d-block">Purpose of Request:</span>
+            <div id="modal_evt_purpose" class="fw-semibold text-dark bg-light p-2 rounded"></div>
+        </div>
+        <div class="mb-3">
+            <span class="text-muted small d-block">Room to be Used / Reserved Room:</span>
+            <span id="modal_evt_room" class="badge bg-info text-dark fs-6 px-3 py-2 fw-bold"><i class="fa-solid fa-door-open me-1"></i></span>
+        </div>
+        <div class="mb-3">
+            <span class="text-muted small d-block mb-1">Equipment / Items to be Borrowed:</span>
+            <div id="modal_evt_equipment" class="p-2 border rounded bg-white text-dark small"></div>
+        </div>
+        <div class="row g-2">
+            <div class="col-6">
+                <span class="text-muted small d-block">Date Needed:</span>
+                <strong id="modal_evt_date" class="text-dark"></strong>
+            </div>
+            <div class="col-6">
+                <span class="text-muted small d-block">Status:</span>
+                <span id="modal_evt_status" class="badge rounded-pill px-3 py-1"></span>
+            </div>
+        </div>
+      </div>
+      <div class="modal-footer bg-light border-0">
+        <button type="button" class="btn btn-secondary btn-sm rounded-pill px-3" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Modal para sa Edit & Review Request Items -->
 <div class="modal fade" id="viewRequestModal" tabindex="-1">
   <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -826,6 +971,24 @@ document.addEventListener("DOMContentLoaded", function() {
         navigator.serviceWorker.register('sw.js').catch(err => console.log('SW registration failed:', err));
     }
 });
+
+function showBoardEventDetails(groupId, reqName, dept, purpose, room, dateNeeded, status, equipmentList) {
+    $('#modal_evt_group_id').text('#' + groupId);
+    $('#modal_evt_req_name').text(reqName);
+    $('#modal_evt_dept').text(dept);
+    $('#modal_evt_purpose').text(purpose);
+    $('#modal_evt_room').html('<i class="fa-solid fa-door-open me-1"></i>' + (room || 'Unspecified Room'));
+    $('#modal_evt_equipment').html(equipmentList || '<i>No specific equipment list</i>');
+    $('#modal_evt_date').text(dateNeeded);
+
+    let stBadge = $('#modal_evt_status');
+    stBadge.text(status);
+    if (status === 'Approved') stBadge.attr('class', 'badge bg-success rounded-pill px-3 py-1');
+    else if (status === 'Rejected') stBadge.attr('class', 'badge bg-danger rounded-pill px-3 py-1');
+    else stBadge.attr('class', 'badge bg-warning text-dark rounded-pill px-3 py-1');
+
+    new bootstrap.Modal(document.getElementById('scheduleEventModal')).show();
+}
 
 function openViewRequestModal(groupId, type) {
     $('#viewRequestModalBody').html('<div class="text-center py-4"><i class="fa-solid fa-spinner fa-spin fs-3 text-primary"></i> <p class="mt-2 text-muted">Loading request details...</p></div>');

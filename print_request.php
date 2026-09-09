@@ -89,6 +89,10 @@ while ($row = $result->fetch_assoc()) {
             <td><?= $first_row['date_needed'] ? date('Y-m-d', strtotime($first_row['date_needed'])) : '-' ?></td>
         </tr>
         <tr>
+            <td class="fw-bold">Room Reserved:</td>
+            <td colspan="3"><?= htmlspecialchars($first_row['room_reserved'] ?: 'N/A') ?></td>
+        </tr>
+        <tr>
             <td colspan="4" class="text-center fw-bold bg-light-gray">Purpose</td>
         </tr>
         <tr>

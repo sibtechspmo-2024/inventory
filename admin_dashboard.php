@@ -14,10 +14,10 @@ if (isset($_GET['fetch_requests']) && $_GET['fetch_requests'] == '1') {
     $req_table = ($type === 'maintenance') ? 'maintenance_requests' : 'supply_requests';
 
     $requests = $conn->query("
-        SELECT request_group_id, requisitioner_name, department, purpose, COUNT(*) as total_items, MAX(id) as max_id
+        SELECT request_group_id, requisitioner_name, department, purpose, room_reserved, COUNT(*) as total_items, MAX(id) as max_id
         FROM {$req_table}
         WHERE status = 'Pending'
-        GROUP BY request_group_id, requisitioner_name, department, purpose
+        GROUP BY request_group_id, requisitioner_name, department, purpose, room_reserved
         ORDER BY max_id DESC
     ");
 
@@ -27,7 +27,7 @@ if (isset($_GET['fetch_requests']) && $_GET['fetch_requests'] == '1') {
             echo '<td class="fw-bold text-logo-blue">#' . htmlspecialchars($row['request_group_id']) . '</td>';
             echo '<td>' . htmlspecialchars($row['requisitioner_name']) . '</td>';
             echo '<td><span class="badge bg-light text-dark border">' . htmlspecialchars($row['department']) . '</span></td>';
-            echo '<td><span class="badge bg-secondary rounded-pill">' . $row['total_items'] . ' item(s)</span></td>';
+            echo '<td><span class="badge bg-info text-dark fw-bold"><i class="fa-solid fa-door-open me-1"></i>' . htmlspecialchars($row['room_reserved'] ?: 'N/A') . '</span></td>';
             echo '<td>' . htmlspecialchars($row['purpose']) . '</td>';
             echo '<td class="text-end">';
             echo '<button class="btn btn-sm btn-outline-primary rounded-pill px-3" onclick="openViewRequestModal(\'' . htmlspecialchars($row['request_group_id'], ENT_QUOTES) . '\', \'' . $type . '\')">';
@@ -198,18 +198,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_request'])) {
 }
 
 $office_requests = $conn->query("
-    SELECT request_group_id, requisitioner_name, department, purpose, COUNT(*) as total_items, MAX(id) as max_id
+    SELECT request_group_id, requisitioner_name, department, purpose, room_reserved, COUNT(*) as total_items, MAX(id) as max_id
     FROM supply_requests
     WHERE status = 'Pending'
-    GROUP BY request_group_id, requisitioner_name, department, purpose
+    GROUP BY request_group_id, requisitioner_name, department, purpose, room_reserved
     ORDER BY max_id DESC
 ");
 
 $maint_requests = $conn->query("
-    SELECT request_group_id, requisitioner_name, department, purpose, COUNT(*) as total_items, MAX(id) as max_id
+    SELECT request_group_id, requisitioner_name, department, purpose, room_reserved, COUNT(*) as total_items, MAX(id) as max_id
     FROM maintenance_requests
     WHERE status = 'Pending'
-    GROUP BY request_group_id, requisitioner_name, department, purpose
+    GROUP BY request_group_id, requisitioner_name, department, purpose, room_reserved
     ORDER BY max_id DESC
 ");
 
@@ -249,7 +249,7 @@ $all_history_requests = [];
 
 if ($req_hist_cat === 'all' || $req_hist_cat === 'office') {
     $off_sql = "
-        SELECT 'office' as type, request_group_id, requisitioner_name, department, purpose, status,
+        SELECT 'office' as type, request_group_id, requisitioner_name, department, purpose, room_reserved, status,
                COUNT(*) as total_items, MAX(created_at) as created_at, MAX(approved_at) as approved_at
         FROM supply_requests
         WHERE 1=1
@@ -257,7 +257,7 @@ if ($req_hist_cat === 'all' || $req_hist_cat === 'office') {
     if ($req_hist_status !== 'all') {
         $off_sql .= " AND status = '" . $conn->real_escape_string($req_hist_status) . "'";
     }
-    $off_sql .= " GROUP BY request_group_id, requisitioner_name, department, purpose, status";
+    $off_sql .= " GROUP BY request_group_id, requisitioner_name, department, purpose, room_reserved, status";
     $off_res = $conn->query($off_sql);
     if ($off_res) {
         while ($r = $off_res->fetch_assoc()) $all_history_requests[] = $r;
@@ -266,7 +266,7 @@ if ($req_hist_cat === 'all' || $req_hist_cat === 'office') {
 
 if ($req_hist_cat === 'all' || $req_hist_cat === 'maintenance') {
     $mnt_sql = "
-        SELECT 'maintenance' as type, request_group_id, requisitioner_name, department, purpose, status,
+        SELECT 'maintenance' as type, request_group_id, requisitioner_name, department, purpose, room_reserved, status,
                COUNT(*) as total_items, MAX(created_at) as created_at, MAX(approved_at) as approved_at
         FROM maintenance_requests
         WHERE 1=1
@@ -274,7 +274,7 @@ if ($req_hist_cat === 'all' || $req_hist_cat === 'maintenance') {
     if ($req_hist_status !== 'all') {
         $mnt_sql .= " AND status = '" . $conn->real_escape_string($req_hist_status) . "'";
     }
-    $mnt_sql .= " GROUP BY request_group_id, requisitioner_name, department, purpose, status";
+    $mnt_sql .= " GROUP BY request_group_id, requisitioner_name, department, purpose, room_reserved, status";
     $mnt_res = $conn->query($mnt_sql);
     if ($mnt_res) {
         while ($r = $mnt_res->fetch_assoc()) $all_history_requests[] = $r;
@@ -285,6 +285,27 @@ if ($req_hist_cat === 'all' || $req_hist_cat === 'maintenance') {
 usort($all_history_requests, function($a, $b) {
     return strtotime($b['created_at']) - strtotime($a['created_at']);
 });
+
+// Query for Calendar Scheduling (Room Reservations)
+$calendar_schedules = [];
+$cs_sql = "
+    SELECT 'office' as type, request_group_id, requisitioner_name, department, purpose, room_reserved, date_needed, status, MAX(request_date) as created_at
+    FROM supply_requests
+    WHERE date_needed IS NOT NULL AND date_needed != ''
+    GROUP BY request_group_id, requisitioner_name, department, purpose, room_reserved, date_needed, status
+    UNION ALL
+    SELECT 'maintenance' as type, request_group_id, requisitioner_name, department, purpose, room_reserved, date_needed, status, MAX(request_date) as created_at
+    FROM maintenance_requests
+    WHERE date_needed IS NOT NULL AND date_needed != ''
+    GROUP BY request_group_id, requisitioner_name, department, purpose, room_reserved, date_needed, status
+    ORDER BY date_needed ASC
+";
+$cs_res = $conn->query($cs_sql);
+if ($cs_res) {
+    while ($r = $cs_res->fetch_assoc()) {
+        $calendar_schedules[] = $r;
+    }
+}
 ?>
 
 <!DOCTYPE html>
@@ -410,6 +431,12 @@ $is_req_hist = isset($_GET['req_status']) || isset($_GET['req_cat']);
                 </button>
             </li>
             <li class="nav-item">
+                <button class="nav-link d-flex align-items-center justify-content-center gap-2" id="calendar-sched-tab" data-bs-toggle="tab" data-bs-target="#calendar-sched" type="button">
+                    <span><i class="fa-solid fa-calendar-days me-1"></i> Calendar Scheduling</span>
+                    <span class="badge rounded-pill bg-warning text-dark fw-bold"><?= count($calendar_schedules) ?></span>
+                </button>
+            </li>
+            <li class="nav-item">
                 <button class="nav-link <?= $is_stock_hist ? 'active' : '' ?> d-flex align-items-center justify-content-center gap-2" id="stock-hist-tab" data-bs-toggle="tab" data-bs-target="#stock-hist" type="button">
                     <span><i class="fa-solid fa-clock-rotate-left me-1"></i> Stock Update History</span>
                     <span class="badge rounded-pill bg-dark text-white fw-bold"><?= $stock_history ? $stock_history->num_rows : 0 ?></span>
@@ -435,6 +462,7 @@ $is_req_hist = isset($_GET['req_status']) || isset($_GET['req_cat']);
                                 <th>Order ID</th>
                                 <th>Requisitioner</th>
                                 <th>Dept</th>
+                                <th>Room Reserved</th>
                                 <th>Total Items</th>
                                 <th>Purpose</th>
                                 <th class="text-end">Action</th>
@@ -447,6 +475,7 @@ $is_req_hist = isset($_GET['req_status']) || isset($_GET['req_cat']);
                                         <td class="fw-bold text-logo-blue">#<?= htmlspecialchars($row['request_group_id']) ?></td>
                                         <td><?= htmlspecialchars($row['requisitioner_name']) ?></td>
                                         <td><span class="badge bg-light text-dark border"><?= htmlspecialchars($row['department']) ?></span></td>
+                                        <td><span class="badge bg-info text-dark fw-bold"><i class="fa-solid fa-door-open me-1"></i><?= htmlspecialchars($row['room_reserved'] ?: 'N/A') ?></span></td>
                                         <td><span class="badge bg-secondary rounded-pill"><?= $row['total_items'] ?> item(s)</span></td>
                                         <td><?= htmlspecialchars($row['purpose']) ?></td>
                                         <td class="text-end">
@@ -458,7 +487,7 @@ $is_req_hist = isset($_GET['req_status']) || isset($_GET['req_cat']);
                                 <?php endwhile; ?>
                             <?php else: ?>
                                 <tr>
-                                    <td colspan="6" class="text-center text-muted py-4">Walang nakabinbing Office Supply Orders.</td>
+                                    <td colspan="7" class="text-center text-muted py-4">Walang nakabinbing Office Supply Orders.</td>
                                 </tr>
                             <?php endif; ?>
                         </tbody>
@@ -483,6 +512,7 @@ $is_req_hist = isset($_GET['req_status']) || isset($_GET['req_cat']);
                                 <th>Order ID</th>
                                 <th>Requisitioner</th>
                                 <th>Dept</th>
+                                <th>Room Reserved</th>
                                 <th>Total Items</th>
                                 <th>Purpose</th>
                                 <th class="text-end">Action</th>
@@ -495,6 +525,7 @@ $is_req_hist = isset($_GET['req_status']) || isset($_GET['req_cat']);
                                         <td class="fw-bold text-logo-blue">#<?= htmlspecialchars($row['request_group_id']) ?></td>
                                         <td><?= htmlspecialchars($row['requisitioner_name']) ?></td>
                                         <td><span class="badge bg-light text-dark border"><?= htmlspecialchars($row['department']) ?></span></td>
+                                        <td><span class="badge bg-info text-dark fw-bold"><i class="fa-solid fa-door-open me-1"></i><?= htmlspecialchars($row['room_reserved'] ?: 'N/A') ?></span></td>
                                         <td><span class="badge bg-secondary rounded-pill"><?= $row['total_items'] ?> item(s)</span></td>
                                         <td><?= htmlspecialchars($row['purpose']) ?></td>
                                         <td class="text-end">
@@ -506,7 +537,7 @@ $is_req_hist = isset($_GET['req_status']) || isset($_GET['req_cat']);
                                 <?php endwhile; ?>
                             <?php else: ?>
                                 <tr>
-                                    <td colspan="6" class="text-center text-muted py-4">Walang nakabinbing Maintenance Supply Orders.</td>
+                                    <td colspan="7" class="text-center text-muted py-4">Walang nakabinbing Maintenance Supply Orders.</td>
                                 </tr>
                             <?php endif; ?>
                         </tbody>
@@ -542,6 +573,7 @@ $is_req_hist = isset($_GET['req_status']) || isset($_GET['req_cat']);
                                 <th>Category</th>
                                 <th>Requisitioner</th>
                                 <th>Dept</th>
+                                <th>Room Reserved</th>
                                 <th>Total Items</th>
                                 <th>Status</th>
                                 <th>Date Placed</th>
@@ -574,6 +606,7 @@ $is_req_hist = isset($_GET['req_status']) || isset($_GET['req_cat']);
                                         <td><?= $cat_badge ?></td>
                                         <td class="fw-semibold text-dark"><?= htmlspecialchars($req['requisitioner_name']) ?></td>
                                         <td><span class="badge bg-light text-dark border"><?= htmlspecialchars($req['department']) ?></span></td>
+                                        <td><span class="badge bg-info text-dark fw-bold"><i class="fa-solid fa-door-open me-1"></i><?= htmlspecialchars($req['room_reserved'] ?: 'N/A') ?></span></td>
                                         <td><span class="badge bg-secondary rounded-pill"><?= $req['total_items'] ?> item(s)</span></td>
                                         <td><?= $status_badge ?></td>
                                         <td class="small text-secondary"><?= date('M d, Y h:i A', strtotime($req['created_at'])) ?></td>
@@ -594,7 +627,7 @@ $is_req_hist = isset($_GET['req_status']) || isset($_GET['req_cat']);
                                 <?php endforeach; ?>
                             <?php else: ?>
                                 <tr>
-                                    <td colspan="8" class="text-center text-muted py-4">
+                                    <td colspan="9" class="text-center text-muted py-4">
                                         <i class="fa-solid fa-folder-open fs-3 d-block mb-2 text-secondary"></i>
                                         Walang nakatagong kasaysayan ng mga order requests.
                                     </td>
@@ -606,7 +639,72 @@ $is_req_hist = isset($_GET['req_status']) || isset($_GET['req_cat']);
             </div>
         </div>
 
-        <!-- Tab 4: Stock Update History -->
+        <!-- Tab 4: Calendar Scheduling (Room Reservations) -->
+        <div class="tab-pane fade" id="calendar-sched">
+            <div class="card p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold text-dark mb-0"><i class="fa-solid fa-calendar-days text-logo-blue me-2"></i>Calendar Scheduling (Room Reservations)</h5>
+                    <span class="badge bg-primary px-3 py-2 fw-bold"><i class="fa-solid fa-door-open me-1"></i>Room Reservations Schedule</span>
+                </div>
+                <div class="alert alert-info py-2 mb-3 small d-flex align-items-center gap-2">
+                    <i class="fa-solid fa-circle-info fs-5"></i>
+                    <span>Ang Calendar Schedule ay nagpapakita ng <strong>Room Reserved</strong> ng user sa bawat nakatakdang petsa. Ang mga nahiram na gamit ay tinanggal na dito.</span>
+                </div>
+                <div class="table-responsive table-container">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Date Needed</th>
+                                <th>Room Reserved</th>
+                                <th>Requisitioner</th>
+                                <th>Dept</th>
+                                <th>Purpose</th>
+                                <th>Category</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (!empty($calendar_schedules)): ?>
+                                <?php foreach ($calendar_schedules as $sched): ?>
+                                    <?php
+                                    $st = $sched['status'];
+                                    if ($st === 'Approved') {
+                                        $s_badge = '<span class="badge bg-success"><i class="fa-solid fa-check me-1"></i>Approved</span>';
+                                    } elseif ($st === 'Rejected') {
+                                        $s_badge = '<span class="badge bg-danger"><i class="fa-solid fa-xmark me-1"></i>Rejected</span>';
+                                    } else {
+                                        $s_badge = '<span class="badge bg-warning text-dark"><i class="fa-solid fa-clock me-1"></i>Pending</span>';
+                                    }
+
+                                    $cat_badge = ($sched['type'] === 'maintenance')
+                                        ? '<span class="badge bg-warning text-dark"><i class="fa-solid fa-wrench me-1"></i>Maintenance</span>'
+                                        : '<span class="badge bg-primary text-white"><i class="fa-solid fa-box-open me-1"></i>Office</span>';
+                                    ?>
+                                    <tr>
+                                        <td class="fw-bold text-dark"><i class="fa-regular fa-calendar-check text-primary me-2"></i><?= date('F d, Y', strtotime($sched['date_needed'])) ?></td>
+                                        <td><span class="badge bg-primary text-white fs-6 px-3 py-2"><i class="fa-solid fa-door-open me-1"></i><?= htmlspecialchars($sched['room_reserved'] ?: 'Unspecified Room') ?></span></td>
+                                        <td class="fw-semibold text-dark"><?= htmlspecialchars($sched['requisitioner_name']) ?></td>
+                                        <td><span class="badge bg-light text-dark border"><?= htmlspecialchars($sched['department']) ?></span></td>
+                                        <td><?= htmlspecialchars($sched['purpose']) ?></td>
+                                        <td><?= $cat_badge ?></td>
+                                        <td><?= $s_badge ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <tr>
+                                    <td colspan="7" class="text-center text-muted py-4">
+                                        <i class="fa-solid fa-calendar-xmark fs-2 d-block text-secondary mb-2"></i>
+                                        Walang nakaschedule na room reservation sa kasalukuyan.
+                                    </td>
+                                </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 5: Stock Update History -->
         <div class="tab-pane fade <?= $is_stock_hist ? 'show active' : '' ?>" id="stock-hist">
             <div class="card p-4">
                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">

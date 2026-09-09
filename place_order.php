@@ -23,6 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['request_supply'])) {
     $department = trim($_POST['department'] ?? '');
     $purpose = trim($_POST['purpose'] ?? '');
     $date_needed = $_POST['date_needed'] ?? null;
+    $room_reserved = trim($_POST['room_reserved'] ?? '');
 
     $item_ids = $_POST['item_id'] ?? [];
     $quantities = $_POST['quantity'] ?? [];
@@ -34,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['request_supply'])) {
         $request_table = ($request_type === 'maintenance') ? 'maintenance_requests' : 'supply_requests';
         $item_table = ($request_type === 'maintenance') ? 'maintenance_items' : 'items';
 
-        $stmt = $conn->prepare("INSERT INTO {$request_table} (request_group_id, user_id, requisitioner_name, department, item_id, quantity, purpose, date_needed) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt = $conn->prepare("INSERT INTO {$request_table} (request_group_id, user_id, requisitioner_name, department, item_id, quantity, purpose, date_needed, room_reserved) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $check_stock_stmt = $conn->prepare("SELECT actual_stocks, item_name FROM {$item_table} WHERE id = ?");
 
         $inserted_count = 0;
@@ -55,7 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['request_supply'])) {
                         throw new Exception("Kulang ang available stock para sa item na: " . $iname);
                     }
 
-                    $stmt->bind_param("sississs", $request_group_id, $user_id, $requisitioner_name, $department, $item_id, $qty, $purpose, $date_needed);
+                    $stmt->bind_param("sississss", $request_group_id, $user_id, $requisitioner_name, $department, $item_id, $qty, $purpose, $date_needed, $room_reserved);
                     $stmt->execute();
                     $inserted_count++;
                 }
@@ -117,7 +118,7 @@ $maint_items = $conn->query("SELECT * FROM maintenance_items WHERE actual_stocks
     <div class="container px-4">
         <a class="navbar-brand fw-bold text-white d-flex align-items-center" href="user_dashboard.php">
             <img src="logo.jpg" alt="SIBTECH Logo" class="navbar-brand-logo rounded-circle border border-2 border-white shadow-sm me-2" style="width: 38px;">
-            <span>SIBTECH SUPPLY ROOM <span class="fw-light opacity-75"></span>
+            <span>SIBTECH SUPPLY ROOM</span>
         </a>
         <div class="d-flex align-items-center gap-2">
             <a href="user_dashboard.php" class="btn btn-outline-light btn-sm fw-semibold rounded-pill px-3">
@@ -161,17 +162,21 @@ $maint_items = $conn->query("SELECT * FROM maintenance_items WHERE actual_stocks
                     </div>
                     <div class="col-md-6">
                         <label class="form-label fw-semibold text-dark">Requisitioner Full Name</label>
-                        <input type="text" name="requisitioner_name" class="form-control fw-semibold" value="<?= htmlspecialchars($default_fullname) ?>" required placeholder=Full Name>
+                        <input type="text" name="requisitioner_name" class="form-control fw-semibold" value="<?= htmlspecialchars($default_fullname) ?>" required placeholder="Full Name">
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label class="form-label fw-semibold text-dark">Department</label>
-                        <input type="text" name="department" class="form-control fw-semibold" required placeholder=" SPMO, HR, IT">
+                        <input type="text" name="department" class="form-control fw-semibold" required placeholder="SPMO, HR, IT">
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label class="form-label fw-semibold text-dark">Purpose of Request</label>
-                        <input type="text" name="purpose" class="form-control fw-semibold" required placeholder="">
+                        <input type="text" name="purpose" class="form-control fw-semibold" required placeholder="e.g. Class / Event">
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold text-dark">Room Reserved</label>
+                        <input type="text" name="room_reserved" class="form-control fw-semibold" required placeholder="e.g. Room 101, AVR, Lab 1">
+                    </div>
+                    <div class="col-md-3">
                         <label class="form-label fw-semibold text-dark">Date Needed</label>
                         <input type="date" name="date_needed" class="form-control fw-semibold" required>
                     </div>
@@ -202,7 +207,7 @@ $maint_items = $conn->query("SELECT * FROM maintenance_items WHERE actual_stocks
                             <tr id="empty-row">
                                 <td colspan="5" class="text-center text-muted py-4">
                                     <i class="bi bi-basket fs-3 d-block text-secondary mb-1"></i>
-                                    No selected items please click<strong>Add Item</strong> 
+                                    No selected items please click <strong>Add Item</strong>
                                 </td>
                             </tr>
                         </tbody>
@@ -234,7 +239,6 @@ $maint_items = $conn->query("SELECT * FROM maintenance_items WHERE actual_stocks
                 <div class="mb-3">
                     <label class="form-label fw-semibold text-dark">Pumili ng Available Item</label>
                     <select id="modal_item_select" class="form-select fw-semibold">
-                        <!-- Populated by JS based on request_type -->
                     </select>
                 </div>
                 <div class="mb-3">
